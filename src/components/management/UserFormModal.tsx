@@ -69,7 +69,7 @@ export default function UserFormModal({
   // Success Screen State
   const [successData, setSuccessData] = useState<any | null>(null);
   const [copied, setCopied] = useState(false);
-  const { showToast } = useToastStore(); // Initialize toast
+  const { showToast } = useToastStore();
 
   useEffect(() => {
     if (isOpen) {

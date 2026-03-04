@@ -6,7 +6,6 @@ import {
   MoreHorizontal,
   ChevronLeft,
   ChevronRight,
-  SlidersHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,12 +22,12 @@ export interface Column<T> {
   className?: string;
 }
 
-// FIX: Added <T> generic to ActionItem so it can be passed to GenericDataTableProps
 export interface ActionItem<T> {
   label: string | ((item: T) => string);
   icon?: React.ReactNode;
   onClick: (item: T) => void;
   variant?: "default" | "danger";
+  hidden?: (item: T) => boolean;
 }
 
 interface PaginationMetadata {
@@ -45,7 +44,7 @@ interface GenericDataTableProps<T> {
   subtitle?: string;
   data: T[];
   columns: Column<T>[];
-  actions?: ActionItem<T>[]; // FIX: Passed the <T> type argument here
+  actions?: ActionItem<T>[];
   filters?: FilterConfig[];
   onAddClick?: () => void;
   onExportClick?: () => void;
@@ -78,7 +77,6 @@ export function GenericDataTable<T>({
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      // If the menu is open and the clicked target is NOT inside the dropdownRef container
       if (
         openMenuIdx !== null &&
         dropdownRef.current &&
@@ -87,13 +85,8 @@ export function GenericDataTable<T>({
         setOpenMenuIdx(null);
       }
     }
-
-    // Bind the event listener
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      // Unbind the event listener on clean up
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [openMenuIdx]);
 
   return (
@@ -125,18 +118,17 @@ export function GenericDataTable<T>({
       </div>
 
       {/* 2. Search & Filter Bar */}
-      <div className="bg-white p-3 rounded-xl border border-slate-200 flex items-center justify-between shadow-sm">
+      <div className="bg-white p-3 rounded-xl border border-slate-200 flex items-center justify-between shadow-sm relative z-20">
         <div className="flex items-center gap-3 flex-1">
           <div className="relative w-full max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
               type="text"
               placeholder={searchPlaceholder}
-              onChange={(e) => onSearchChange?.(e.target.value)} // Trigger the BE fetch
+              onChange={(e) => onSearchChange?.(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             />
           </div>
-
           <div className="flex items-center gap-2">
             {filters.map((filter, index) => (
               <div key={index} className="relative">
@@ -159,21 +151,16 @@ export function GenericDataTable<T>({
             ))}
           </div>
         </div>
-        <div className="flex items-center gap-2 pl-3 border-l border-slate-100">
-          <button className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-500">
-            <SlidersHorizontal className="h-4 w-4" />
-          </button>
-        </div>
       </div>
 
       {/* 3. Main Table Section */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm relative">
         {isLoading ? (
           <div className="p-12 text-center text-slate-400 text-sm">
             Loading data...
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-visible">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-100">
@@ -203,7 +190,10 @@ export function GenericDataTable<T>({
                 {data.map((item, idx) => (
                   <tr
                     key={idx}
-                    className="group hover:bg-slate-50/50 transition-colors"
+                    className={cn(
+                      "group hover:bg-slate-50/50 transition-colors",
+                      openMenuIdx === idx ? "relative z-[50]" : "relative z-0",
+                    )}
                   >
                     <td className="px-6 py-4 text-center">
                       <input
@@ -224,10 +214,10 @@ export function GenericDataTable<T>({
                           : (item[col.accessor] as React.ReactNode)}
                       </td>
                     ))}
-                    <td className="px-6 py-4 text-right relative">
+                    <td className="px-6 py-4 text-right">
                       <div
                         ref={openMenuIdx === idx ? dropdownRef : null}
-                        className="inline-block text-left"
+                        className="inline-block relative"
                       >
                         <button
                           onClick={() =>
@@ -239,39 +229,35 @@ export function GenericDataTable<T>({
                         </button>
 
                         {openMenuIdx === idx && (
-                          <div
-                            className={cn(
-                              "absolute right-6 w-48 bg-white border border-slate-200 rounded-xl shadow-2xl z-[100] py-1.5 animate-in fade-in zoom-in duration-200",
-
-                              idx >= data.length - 2 && data.length > 3
-                                ? "bottom-full mb-2 origin-bottom"
-                                : "top-10 origin-top",
-                            )}
-                          >
-                            {actions?.map((action, aIdx) => (
-                              <button
-                                key={aIdx}
-                                onClick={() => {
-                                  action.onClick(item);
-                                  setOpenMenuIdx(null);
-                                }}
-                                className={cn(
-                                  "w-full px-4 py-2.5 text-left text-xs font-bold flex items-center gap-2 transition-colors",
-                                  action.variant === "danger"
-                                    ? "text-red-600 hover:bg-red-50"
-                                    : "text-slate-600 hover:bg-slate-50",
-                                )}
-                              >
-                                {action.icon && (
-                                  <span className="opacity-70">
-                                    {action.icon}
-                                  </span>
-                                )}
-                                {typeof action.label === "function"
-                                  ? action.label(item)
-                                  : action.label}
-                              </button>
-                            ))}
+                          <div className="absolute right-0 top-8 w-48 bg-white border border-slate-200 rounded-xl shadow-2xl z-[100] py-1.5 animate-in fade-in zoom-in duration-200 origin-top-right">
+                            {actions
+                              ?.filter((action) =>
+                                action.hidden ? !action.hidden(item) : true,
+                              ) // Filter hidden items
+                              .map((action, aIdx) => (
+                                <button
+                                  key={aIdx}
+                                  onClick={() => {
+                                    action.onClick(item);
+                                    setOpenMenuIdx(null);
+                                  }}
+                                  className={cn(
+                                    "w-full px-4 py-2.5 text-left text-xs font-bold flex items-center gap-2 transition-colors",
+                                    action.variant === "danger"
+                                      ? "text-red-600 hover:bg-red-50"
+                                      : "text-slate-600 hover:bg-slate-50",
+                                  )}
+                                >
+                                  {action.icon && (
+                                    <span className="opacity-70">
+                                      {action.icon}
+                                    </span>
+                                  )}
+                                  {typeof action.label === "function"
+                                    ? action.label(item)
+                                    : action.label}
+                                </button>
+                              ))}
                           </div>
                         )}
                       </div>
@@ -283,9 +269,8 @@ export function GenericDataTable<T>({
           </div>
         )}
 
-        {/* 4. Updated Footer / Pagination Section */}
-        <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-white">
-          {/* Left Side: Status Text */}
+        {/* 4. Footer Section */}
+        <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-white rounded-b-xl relative z-10">
           <p className="text-[11px] font-medium text-slate-400">
             Showing{" "}
             <span className="text-slate-900 font-bold">
@@ -297,10 +282,7 @@ export function GenericDataTable<T>({
             </span>{" "}
             items
           </p>
-
-          {/* Right Side: Grouped Controls */}
           <div className="flex items-center gap-6">
-            {/* Page Size Selector */}
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-slate-400 font-medium">
                 Rows per page:
@@ -308,7 +290,7 @@ export function GenericDataTable<T>({
               <select
                 value={pagination?.per_page || 5}
                 onChange={(e) => onPageSizeChange?.(Number(e.target.value))}
-                className="text-[11px] font-bold text-slate-700 bg-transparent outline-none cursor-pointer hover:text-indigo-600 transition-colors"
+                className="text-[11px] font-bold text-slate-700 bg-transparent outline-none cursor-pointer"
               >
                 {[5, 10, 15, 25, 50].map((size) => (
                   <option key={size} value={size}>
@@ -317,40 +299,30 @@ export function GenericDataTable<T>({
                 ))}
               </select>
             </div>
-
-            {/* Pagination Buttons */}
             <div className="flex items-center gap-1 border-l pl-6 border-slate-100">
               <button
                 disabled={pagination?.current_page === 1}
                 onClick={() =>
                   onPageChange?.((pagination?.current_page ?? 1) - 1)
                 }
-                className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 disabled:opacity-50"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-
               <div className="flex items-center px-2">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mr-2">
-                  Page
-                </span>
                 <span className="text-xs font-bold px-3 py-1 bg-slate-900 text-white rounded-lg shadow-sm">
                   {pagination?.current_page}
                 </span>
-                <span className="text-[11px] font-bold text-slate-400 mx-2">
-                  of
-                </span>
-                <span className="text-[11px] font-bold text-slate-900">
-                  {pagination?.last_page}
+                <span className="text-[11px] font-bold text-slate-400 mx-2 text-nowrap">
+                  of {pagination?.last_page}
                 </span>
               </div>
-
               <button
                 disabled={pagination?.current_page === pagination?.last_page}
                 onClick={() =>
                   onPageChange?.((pagination?.current_page ?? 1) + 1)
                 }
-                className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 disabled:opacity-50"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>

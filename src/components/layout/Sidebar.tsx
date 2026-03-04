@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { useNavigate, Link, useLocation } from "react-router-dom"; // Added Link and useLocation
 import { HasPermission } from "@/components/auth/HasPermission";
 import { PERM } from "@/types/auth";
+import { useTabStore } from "@/store/tabStore";
 
 // Mapping menu groups to their required permissions
 const menuGroups = [
@@ -42,8 +43,8 @@ const menuGroups = [
       PERM.VIEW_ALL_COMMAND_LOGS,
     items: [
       { name: "Providers", icon: Server, url: "/providers" },
-      { name: "Command Defs", icon: Code2, url: "/commands" },
       { name: "Data Sources", icon: Database, url: "/sources" },
+      { name: "Command Defs", icon: Code2, url: "/commands" },
     ],
   },
   {
@@ -61,7 +62,8 @@ export function Sidebar() {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const navigate = useNavigate();
-  const location = useLocation(); // Hook to track the current URL
+  const location = useLocation();
+  const addTab = useTabStore((state) => state.addTab);
 
   const handleLogout = () => {
     logout();
@@ -99,7 +101,15 @@ export function Sidebar() {
                   return (
                     <Link
                       key={item.name}
-                      to={item.url} // Redirects to the route defined in App.tsx
+                      to={item.url}
+                      onClick={() =>
+                        addTab({
+                          id: item.url,
+                          title: item.name,
+                          url: item.url,
+                          icon: item.icon,
+                        })
+                      }
                       className={cn(
                         "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all duration-200 group",
                         isActive

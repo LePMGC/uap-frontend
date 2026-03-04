@@ -6,13 +6,13 @@ import { userService } from "@/services/userService";
 import { roleAndPermissionsService } from "@/services/roleService";
 import UserFormModal from "@/components/management/UserFormModal";
 import { useToastStore } from "@/hooks/useToastStore";
-import DeleteUserModal from "@/components/management/DeleteUserModal";
 import ResetPasswordModal from "@/components/management/ResetPasswordModal";
 import {
   GenericDataTable,
   type Column,
   type FilterConfig,
 } from "@/components/ui/GenericDataTable";
+import DeleteConfirmationModal from "@/components/management/DeleteConfirmationModal";
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -72,7 +72,7 @@ export default function UsersPage() {
   const fetchRoles = async () => {
     try {
       const roles = await roleAndPermissionsService.getAllRoles();
-      const formattedRoles = roles.map((role: any) => ({
+      const formattedRoles = roles.data.map((role: any) => ({
         label: capitalizeFirstLetter(role.name),
         value: role.id,
       }));
@@ -275,14 +275,36 @@ export default function UsersPage() {
         onSuccess={() => fetchUsers(currentPage, pageSize)}
       />
 
-      <DeleteUserModal
+      <DeleteConfirmationModal
         isOpen={isDeleteModalOpen}
         onClose={() => {
           setIsDeleteModalOpen(false);
           setUserToDelete(null);
         }}
-        user={userToDelete}
-        onSuccess={() => fetchUsers(currentPage, pageSize)}
+        title="Delete User Account"
+        entityName={userToDelete?.name || ""}
+        description={
+          <p>
+            You are about to permanently delete <b>{userToDelete?.name}</b>.
+            This action will revoke all access and cannot be undone.
+          </p>
+        }
+        onConfirm={async () => {
+          if (userToDelete) {
+            try {
+              await userService.deleteUser(userToDelete.id);
+              showToast("User deleted successfully", "success");
+              fetchUsers(currentPage, pageSize);
+            } catch (error: any) {
+              showToast(
+                error.response?.data?.message || "Failed to delete user",
+                "error",
+              );
+              // Throw the error so the modal's loading state can stop
+              throw error;
+            }
+          }
+        }}
       />
 
       <ResetPasswordModal
