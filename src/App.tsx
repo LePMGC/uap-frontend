@@ -8,6 +8,8 @@ import UsersPage from "./pages/users/UsersPage";
 import { GlobalToast } from "./components/ui/GlobalToast";
 import RolesPage from "./pages/roles/RolesPage";
 import RoleFormPage from "./pages/roles/RoleFormPage";
+import DataSourcesPage from "./pages/data_sources/DataSourcesPage";
+import DataSourceFormPage from "./pages/data_sources/DataSourceFormPage";
 
 export default function App() {
   const { isAuthenticated, needsPasswordChange } = useAuthStore();
@@ -47,6 +49,9 @@ export default function App() {
           <Route path="/roles" element={<RolesPage />} />
           <Route path="/roles/create" element={<RoleFormPage />} />
           <Route path="/roles/:id" element={<RoleFormPage />} />
+          <Route path="/data-sources" element={<DataSourcesPage />} />
+          <Route path="/data-sources/create" element={<DataSourceFormPage />} />
+          <Route path="/data-sources/:id" element={<DataSourceFormPage />} />
 
           {/* Default Redirect */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

@@ -43,7 +43,7 @@ const menuGroups = [
       PERM.VIEW_ALL_COMMAND_LOGS,
     items: [
       { name: "Providers", icon: Server, url: "/providers" },
-      { name: "Data Sources", icon: Database, url: "/sources" },
+      { name: "Data Sources", icon: Database, url: "/data-sources" },
       { name: "Command Defs", icon: Code2, url: "/commands" },
     ],
   },

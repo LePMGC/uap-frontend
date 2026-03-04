@@ -1,13 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  Edit3,
-  Trash2,
-  ShieldCheck,
-  Users,
-  LucideEye,
-  ScanEye,
-  EyeIcon,
-} from "lucide-react";
+import { Trash2, ShieldCheck, Users, EyeIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { GenericDataTable } from "@/components/ui/GenericDataTable";
 import DeleteConfirmationModal from "@/components/management/DeleteConfirmationModal";

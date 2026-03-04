@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Save, ArrowLeft, CheckCircle } from "lucide-react";
+import { Save, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Permission } from "@/types/roles";
 import { roleAndPermissionsService as roleService } from "@/services/roleService";
