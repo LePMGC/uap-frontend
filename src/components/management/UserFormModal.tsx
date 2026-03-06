@@ -96,9 +96,11 @@ export default function UserFormModal({
   const fetchRoles = async () => {
     setLoadingRoles(true);
     try {
-      const data = await roleAndPermissionsService.getAllRoles();
-      setRoles(data);
-      if (mode === "create" && data.length > 0) setSelectedRoleId(data[0].id);
+      const resp = await roleAndPermissionsService.getAllRoles(); // PaginatedResponse<Role>
+      setRoles(resp.data); // set the state – no reassignment
+      if (mode === "create" && resp.data.length > 0) {
+        setSelectedRoleId(resp.data[0].id);
+      }
     } catch (error) {
       console.error("Failed to fetch roles", error);
     } finally {

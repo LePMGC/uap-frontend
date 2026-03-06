@@ -132,6 +132,7 @@ export default function DataSourceFormPage() {
                   <option value="api">Rest API</option>
                   <option value="database">Database (SQL)</option>
                   <option value="sftp">SFTP Server</option>
+                  <option value="upload">File Upload</option>
                 </select>
               </div>
             </div>

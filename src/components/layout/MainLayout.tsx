@@ -4,7 +4,7 @@ import { SystemStatusBar } from "./SystemStatusBar";
 import { NavigationBar } from "./NavigationBar";
 import { Outlet } from "react-router-dom";
 
-export default function MainLayout() {
+export default function MainLayout({}: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-slate-50 flex">
       {/* Fixed Sidebar */}

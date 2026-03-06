@@ -14,7 +14,20 @@ export function NavigationBar() {
 
   const handleClose = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
+
+    const tabToCloseIsActive = activeTabId === id;
     removeTab(id);
+
+    if (tabToCloseIsActive) {
+      const remainingTabs = tabs.filter((t) => t.id !== id);
+      if (remainingTabs.length > 0) {
+        const nextTab = remainingTabs[remainingTabs.length - 1];
+        setActiveTab(nextTab.id);
+        navigate(nextTab.url);
+      } else {
+        navigate("/dashboard");
+      }
+    }
   };
 
   return (

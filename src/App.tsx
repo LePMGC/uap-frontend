@@ -10,6 +10,8 @@ import RolesPage from "./pages/roles/RolesPage";
 import RoleFormPage from "./pages/roles/RoleFormPage";
 import DataSourcesPage from "./pages/data_sources/DataSourcesPage";
 import DataSourceFormPage from "./pages/data_sources/DataSourceFormPage";
+import ProviderInstancesPage from "./pages/provider_instances/ProviderInstancesPage";
+import ProviderInstanceFormPage from "./pages/provider_instances/ProviderInstanceFormPage";
 
 export default function App() {
   const { isAuthenticated, needsPasswordChange } = useAuthStore();
@@ -52,6 +54,21 @@ export default function App() {
           <Route path="/data-sources" element={<DataSourcesPage />} />
           <Route path="/data-sources/create" element={<DataSourceFormPage />} />
           <Route path="/data-sources/:id" element={<DataSourceFormPage />} />
+
+          <Route
+            path="/providers-instances"
+            element={<ProviderInstancesPage />}
+          ></Route>
+
+          <Route
+            path="/providers-instances/create"
+            element={<ProviderInstanceFormPage />}
+          ></Route>
+
+          <Route
+            path="/providers-instances/:id"
+            element={<ProviderInstanceFormPage />}
+          ></Route>
 
           {/* Default Redirect */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

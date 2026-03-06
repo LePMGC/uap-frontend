@@ -42,7 +42,7 @@ const menuGroups = [
       PERM.VIEW_DATASOURCES ||
       PERM.VIEW_ALL_COMMAND_LOGS,
     items: [
-      { name: "Providers", icon: Server, url: "/providers" },
+      { name: "Providers", icon: Server, url: "/providers-instances" },
       { name: "Data Sources", icon: Database, url: "/data-sources" },
       { name: "Command Defs", icon: Code2, url: "/commands" },
     ],
