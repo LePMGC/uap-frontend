@@ -32,11 +32,21 @@ export const providerInstanceService = {
     return response.data;
   },
 
-  testConnection: async (data: any) => {
+  // Use this for NEW instances or when editing (unsaved settings)
+  testConnection: async (payload: {
+    category_slug: string;
+    connection_settings: any;
+  }) => {
     const response = await api.post(
       "/management/instances/test-connection",
-      data,
+      payload,
     );
+    return response.data;
+  },
+
+  // Use this for ALREADY REGISTERED instances (using existing ID)
+  ping: async (id: number | string) => {
+    const response = await api.post(`/management/instances/${id}/ping`);
     return response.data;
   },
 };
