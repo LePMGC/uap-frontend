@@ -44,7 +44,7 @@ const menuGroups = [
     items: [
       { name: "Providers", icon: Server, url: "/providers-instances" },
       { name: "Data Sources", icon: Database, url: "/data-sources" },
-      { name: "Command Defs", icon: Code2, url: "/commands" },
+      { name: "Command Defs", icon: Code2, url: "/commands-defintions" },
     ],
   },
   {
@@ -53,7 +53,7 @@ const menuGroups = [
     items: [
       { name: "Users Management", icon: Users, url: "/users" },
       { name: "Roles & Permissions", icon: UserCircle, url: "/roles" },
-      { name: "Audit Logs", icon: ShieldCheck, url: "/audit" },
+      { name: "Audit Logs", icon: ShieldCheck, url: "/audit-logs" },
     ],
   },
 ];
