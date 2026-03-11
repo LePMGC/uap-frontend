@@ -39,7 +39,7 @@ export const InstanceService = {
 
       // If we asked for flat data, BE returns it under a 'data' key
       if (!grouped) {
-        return response.data?.data ?? [];
+        return response.data?.commands ?? [];
       }
 
       // If we asked for grouped, BE returns the Record<string, Command[]>

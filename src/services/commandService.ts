@@ -20,4 +20,25 @@ export const commandService = {
     const response = await api.get("/management/commands", { params });
     return response.data;
   },
+
+  // Fetches one command
+  getOneCommand: async (id: number | string) => {
+    const response = await api.get(`/management/commands/${id}`);
+    return response.data;
+  },
+
+  createCommand: async (data: any) => {
+    const response = await api.post("/management/commands", data);
+    return response.data;
+  },
+
+  updateCommand: async (id: number | string, data: any) => {
+    const response = await api.put(`/management/commands/${id}`, data);
+    return response.data;
+  },
+
+  deleteCommand: async (id: number | string) => {
+    const response = await api.delete(`/management/commands/${id}`);
+    return response.data;
+  },
 };

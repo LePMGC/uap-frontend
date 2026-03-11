@@ -220,12 +220,13 @@ export function GenericDataTable<T>({
                 </td>
               </tr>
             ) : (
-              data.map((item, rowIdx) => (
-                <tr
-                  key={rowIdx}
-                  className="group hover:bg-slate-50/50 transition-colors border-b border-slate-50 last:border-0"
-                >
-                  {columns.map((column, colIdx) => (
+              data.map((item, rowIdx) => {
+  // Logic to determine if this is one of the last rows
+  const isLastRows = rowIdx >= data.length - 2 && data.length > 2;
+
+  return (
+    <tr key={rowIdx} className="...">
+      {columns.map((column, colIdx) => (
                     <td
                       key={colIdx}
                       className={cn(
@@ -239,28 +240,29 @@ export function GenericDataTable<T>({
                     </td>
                   ))}
 
-                  {/* Conditional Internal Actions Body Cell */}
-                  {hasActions && (
-                    <td className="px-6 py-4 text-right">
-                      <div className="relative flex justify-end">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpenMenuId(
-                              openMenuId === rowIdx ? null : rowIdx,
-                            );
-                          }}
-                          className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-900 transition-colors"
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </button>
+      {hasActions && (
+        <td className="px-6 py-4 text-right">
+          <div className="relative flex justify-end">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpenMenuId(openMenuId === rowIdx ? null : rowIdx);
+              }}
+              className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-900 transition-colors"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
 
-                        {openMenuId === rowIdx && (
-                          <div
-                            ref={menuRef}
-                            className="absolute right-0 top-10 w-48 bg-white rounded-xl shadow-xl border border-slate-100 py-1 z-50 animate-in fade-in zoom-in duration-200"
-                          >
-                            {actions.map((action, actionIdx) => {
+            {openMenuId === rowIdx && (
+              <div
+                ref={menuRef}
+                className={cn(
+                  "absolute right-0 w-48 bg-white rounded-xl shadow-xl border border-slate-100 py-1 z-50 animate-in fade-in zoom-in duration-200",
+                  // IF it's the last rows, move it UP, otherwise move it DOWN
+                  isLastRows ? "bottom-full mb-2 origin-bottom" : "top-10 origin-top"
+                )}
+              >
+                {actions.map((action, actionIdx) => {
                               if (action.hidden?.(item)) return null;
                               return (
                                 <button
@@ -284,13 +286,14 @@ export function GenericDataTable<T>({
                                 </button>
                               );
                             })}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              ))
+              </div>
+            )}
+          </div>
+        </td>
+      )}
+    </tr>
+  );
+})
             )}
           </tbody>
         </table>

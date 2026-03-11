@@ -5,6 +5,9 @@ import { commandService } from "@/services/commandService";
 import { useToastStore } from "@/hooks/useToastStore";
 import { cn } from "@/lib/utils";
 import { Edit2, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+// Import the shared modal
+import DeleteConfirmationModal from "@/components/management/DeleteConfirmationModal";
 
 interface CommandGridProps {
   categorySlug: string;
@@ -12,6 +15,7 @@ interface CommandGridProps {
 
 export function CommandGrid({ categorySlug }: CommandGridProps) {
   const { showToast } = useToastStore();
+  const navigate = useNavigate();
 
   // Data State
   const [data, setData] = useState([]);
@@ -25,11 +29,15 @@ export function CommandGrid({ categorySlug }: CommandGridProps) {
     to: 5,
   });
 
-  // Filter & Pagination States (Mirroring DataSource pattern)
+  // Filter & Pagination States
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
   const [searchQuery, setSearchQuery] = useState("");
   const [actionFilter, setActionFilter] = useState("");
+
+  // Deletion States
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [commandToDelete, setCommandToDelete] = useState<any>(null);
 
   const fetchCommands = async () => {
     setLoading(true);
@@ -62,15 +70,36 @@ export function CommandGrid({ categorySlug }: CommandGridProps) {
     }
   };
 
-  // Re-fetch when category, page, size, search, or action filter changes
   useEffect(() => {
     fetchCommands();
   }, [categorySlug, currentPage, pageSize, searchQuery, actionFilter]);
 
-  // Reset page when switching categories
   useEffect(() => {
     setCurrentPage(1);
   }, [categorySlug]);
+
+  // Trigger delete modal
+  const handleDeleteTrigger = (item: any) => {
+    setCommandToDelete(item);
+    setIsDeleteModalOpen(true);
+  };
+
+  // Confirm deletion logic
+  const handleConfirmDelete = async () => {
+    if (commandToDelete) {
+      try {
+        await commandService.deleteCommand(commandToDelete.id);
+        showToast("Command deleted successfully", "success");
+        fetchCommands();
+      } catch (error: any) {
+        showToast(
+          error.response?.data?.message || "Failed to delete command",
+          "error",
+        );
+        throw error; // Let modal handle loading state
+      }
+    }
+  };
 
   const columns = [
     {
@@ -78,7 +107,7 @@ export function CommandGrid({ categorySlug }: CommandGridProps) {
       accessor: (item: any) => (
         <div className="flex flex-col">
           <span className="font-bold text-slate-900">{item.name}</span>
-          <span className="text-[10px] font-mono text-slate-400 uppercase">
+          <span className="text-[10px] font-mono text-slate-400">
             {item.command_key}
           </span>
         </div>
@@ -117,7 +146,6 @@ export function CommandGrid({ categorySlug }: CommandGridProps) {
     },
   ];
 
-  // Filter definitions for the GenericDataTable
   const filterConfigs = [
     {
       id: "action",
@@ -141,46 +169,63 @@ export function CommandGrid({ categorySlug }: CommandGridProps) {
     {
       label: "Edit Definition",
       icon: <Edit2 className="h-3.5 w-3.5" />,
-      onClick: (item: any) => console.log("Edit", item),
+      onClick: (item: any) => navigate(`/commands-defintions/${item.id}`),
     },
     {
       label: "Delete Command",
       icon: <Trash2 className="h-3.5 w-3.5" />,
       variant: "danger" as const,
-      onClick: (item: any) => console.log("Delete", item),
+      onClick: handleDeleteTrigger, // Updated to use the trigger
     },
   ];
 
   return (
-    <GenericDataTable
-      title=""
-      data={data}
-      isLoading={loading}
-      columns={columns}
-      actions={actions}
-      pagination={pagination}
-      filters={filterConfigs}
-      onPageChange={(page) => setCurrentPage(page)}
-      onPageSizeChange={(newSize) => {
-        setPageSize(newSize);
-        setCurrentPage(1);
-      }}
-      onSearchChange={(val) => {
-        setSearchQuery(val);
-        setCurrentPage(1);
-      }}
-      searchPlaceholder="Search by command name or key..."
-      // ADD THESE PROPS TO ENABLE THE BUTTONS
-      showAdd={true}
-      showExport={true}
-      onAddClick={() => {
-        console.log("Add button clicked");
-        // Example: navigate(`/management/commands/create?category=${categorySlug}`);
-      }}
-      onExportClick={() => {
-        console.log("Exporting", categorySlug, "commands...");
-        // Logic for exporting data
-      }}
-    />
+    <>
+      <GenericDataTable
+        title=""
+        data={data}
+        isLoading={loading}
+        columns={columns}
+        actions={actions}
+        pagination={pagination}
+        filters={filterConfigs}
+        onPageChange={(page) => setCurrentPage(page)}
+        onPageSizeChange={(newSize) => {
+          setPageSize(newSize);
+          setCurrentPage(1);
+        }}
+        onSearchChange={(val) => {
+          setSearchQuery(val);
+          setCurrentPage(1);
+        }}
+        searchPlaceholder="Search by command name or key..."
+        showAdd={true}
+        showExport={true}
+        onAddClick={() => {
+          navigate(`/commands-defintions/create?category=${categorySlug}`);
+        }}
+        onExportClick={() => {
+          console.log("Exporting", categorySlug, "commands...");
+        }}
+      />
+
+      {/* Command Deletion Modal */}
+      <DeleteConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setCommandToDelete(null);
+        }}
+        title="Delete Command Definition"
+        entityName={commandToDelete?.name || ""}
+        description={
+          <p>
+            You are about to permanently delete the command <b>{commandToDelete?.name}</b>.
+            This will remove its protocol mapping and cannot be undone.
+          </p>
+        }
+        onConfirm={handleConfirmDelete}
+      />
+    </>
   );
 }

@@ -1,14 +1,6 @@
 import api from "@/lib/api";
 
 // ...existing code...
-const MOCK_STATS = {
-  users: 120,
-  activeUsers: 42,
-  revenue: 12345,
-  // add fields your UI expects
-};
-
-// ...existing code...
 export const DashboardService = {
   // Add more methods as needed for other dashboard data
   getPlatformHealth: async () => {

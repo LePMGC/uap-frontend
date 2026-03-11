@@ -14,6 +14,7 @@ import ProviderInstancesPage from "./pages/provider_instances/ProviderInstancesP
 import ProviderInstanceFormPage from "./pages/provider_instances/ProviderInstanceFormPage";
 import AuditLogsPage from "./pages/audit/AuditLogsPage";
 import CommandDefinitionsPage from "./pages/commands_definitions/CommandDefinitionsPage";
+import CommandFormPage from "./pages/commands_definitions/CommandFormPage";
 
 export default function App() {
   const { isAuthenticated, needsPasswordChange } = useAuthStore();
@@ -75,6 +76,12 @@ export default function App() {
           <Route
             path="commands-defintions"
             element={<CommandDefinitionsPage />}
+          />
+
+          <Route path="commands-defintions/:id" element={<CommandFormPage />} />
+          <Route
+            path="commands-defintions/create"
+            element={<CommandFormPage />}
           />
 
           {/* 2. Catch-all for the protected area (the very last item in this block) */}
