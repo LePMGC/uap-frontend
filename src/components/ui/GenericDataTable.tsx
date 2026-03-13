@@ -9,6 +9,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { createPortal } from "react-dom";
 
 export interface FilterConfig {
   label: string;
@@ -82,6 +83,7 @@ export function GenericDataTable<T>({
 }: GenericDataTableProps<T>) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -98,7 +100,7 @@ export function GenericDataTable<T>({
   const hasActions = actions && actions.length > 0;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-visible">
       {/* ROW 1: TITLE & SUBTITLE */}
       {(title || subtitle) && (
         <div className="px-4 pt-3 pb-1">
@@ -108,7 +110,7 @@ export function GenericDataTable<T>({
             {title}
           </h3>
           {subtitle && (
-            <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+            <p className="text-[12px] text-slate-400 font-medium mt-0.5">
               {subtitle}
             </p>
           )}
@@ -175,7 +177,7 @@ export function GenericDataTable<T>({
       </div>
 
       {/* Main Table Content */}
-      <div className="overflow-x-auto relative">
+      <div className="overflow-x-auto overflow-y-visible relative">
         <table className="w-full border-collapse">
           <thead>
             <tr className="bg-slate-50/50">
@@ -221,79 +223,90 @@ export function GenericDataTable<T>({
               </tr>
             ) : (
               data.map((item, rowIdx) => {
-  // Logic to determine if this is one of the last rows
-  const isLastRows = rowIdx >= data.length - 2 && data.length > 2;
+                return (
+                  <tr key={rowIdx} className="...">
+                    {columns.map((column, colIdx) => (
+                      <td
+                        key={colIdx}
+                        className={cn(
+                          "px-6 py-4 text-sm text-slate-600",
+                          column.className,
+                        )}
+                      >
+                        {typeof column.accessor === "function"
+                          ? column.accessor(item)
+                          : (item[column.accessor] as React.ReactNode)}
+                      </td>
+                    ))}
 
-  return (
-    <tr key={rowIdx} className="...">
-      {columns.map((column, colIdx) => (
-                    <td
-                      key={colIdx}
-                      className={cn(
-                        "px-6 py-4 text-sm text-slate-600",
-                        column.className,
-                      )}
-                    >
-                      {typeof column.accessor === "function"
-                        ? column.accessor(item)
-                        : (item[column.accessor] as React.ReactNode)}
-                    </td>
-                  ))}
+                    {hasActions && (
+                      <td className="px-6 py-4 text-right">
+                        <div className="relative flex justify-end">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
 
-      {hasActions && (
-        <td className="px-6 py-4 text-right">
-          <div className="relative flex justify-end">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setOpenMenuId(openMenuId === rowIdx ? null : rowIdx);
-              }}
-              className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-900 transition-colors"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </button>
+                              const rect =
+                                e.currentTarget.getBoundingClientRect();
 
-            {openMenuId === rowIdx && (
-              <div
-                ref={menuRef}
-                className={cn(
-                  "absolute right-0 w-48 bg-white rounded-xl shadow-xl border border-slate-100 py-1 z-50 animate-in fade-in zoom-in duration-200",
-                  // IF it's the last rows, move it UP, otherwise move it DOWN
-                  isLastRows ? "bottom-full mb-2 origin-bottom" : "top-10 origin-top"
-                )}
-              >
-                {actions.map((action, actionIdx) => {
-                              if (action.hidden?.(item)) return null;
-                              return (
-                                <button
-                                  key={actionIdx}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    action.onClick(item);
-                                    setOpenMenuId(null);
-                                  }}
-                                  className={cn(
-                                    "w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold transition-colors",
-                                    action.variant === "danger"
-                                      ? "text-red-600 hover:bg-red-50"
-                                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
-                                  )}
-                                >
-                                  {action.icon}
-                                  {typeof action.label === "function"
-                                    ? action.label(item)
-                                    : action.label}
-                                </button>
+                              setMenuPosition({
+                                top: rect.bottom + window.scrollY,
+                                left: rect.right - 192 + window.scrollX,
+                              });
+
+                              setOpenMenuId(
+                                openMenuId === rowIdx ? null : rowIdx,
                               );
-                            })}
-              </div>
-            )}
-          </div>
-        </td>
-      )}
-    </tr>
-  );
-})
+                            }}
+                            className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-900 transition-colors"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </button>
+
+                          {openMenuId === rowIdx &&
+                            createPortal(
+                              <div
+                                ref={menuRef}
+                                className="fixed w-48 bg-white rounded-xl shadow-xl border border-slate-100 py-1 z-[9999]"
+                                style={{
+                                  top: menuPosition.top,
+                                  left: menuPosition.left,
+                                }}
+                              >
+                                {actions.map((action, actionIdx) => {
+                                  if (action.hidden?.(item)) return null;
+
+                                  return (
+                                    <button
+                                      key={actionIdx}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        action.onClick(item);
+                                        setOpenMenuId(null);
+                                      }}
+                                      className={cn(
+                                        "w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold transition-colors",
+                                        action.variant === "danger"
+                                          ? "text-red-600 hover:bg-red-50"
+                                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
+                                      )}
+                                    >
+                                      {action.icon}
+                                      {typeof action.label === "function"
+                                        ? action.label(item)
+                                        : action.label}
+                                    </button>
+                                  );
+                                })}
+                              </div>,
+                              document.body,
+                            )}
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

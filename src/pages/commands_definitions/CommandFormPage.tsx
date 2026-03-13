@@ -7,6 +7,7 @@ import {
   Code2,
   Settings2,
   ChevronDown,
+  ArrowLeft,
 } from "lucide-react";
 import { commandService } from "@/services/commandService";
 import { useToastStore } from "@/hooks/useToastStore";
@@ -25,7 +26,7 @@ export default function CommandFormPage() {
   const [saving, setSaving] = useState(false);
   const [activeView, setActiveView] = useState<"code" | "visual">("code");
   const [errors, setErrors] = useState<Record<string, string>>({});
-  
+
   // New state for category metadata (to get actions)
   const [categoryData, setCategoryData] = useState<any>(null);
 
@@ -47,7 +48,7 @@ export default function CommandFormPage() {
     const initPage = async () => {
       try {
         setLoading(true);
-        
+
         // 1. Fetch Command if Editing
         if (id) {
           const data = await commandService.getOneCommand(id);
@@ -83,9 +84,11 @@ export default function CommandFormPage() {
   const validate = () => {
     const newErrors: Record<string, string> = {};
     if (!formData.name?.trim()) newErrors.name = "Display name is required";
-    if (!formData.command_key?.trim()) newErrors.command_key = "Protocol key is required";
+    if (!formData.command_key?.trim())
+      newErrors.command_key = "Protocol key is required";
     if (!formData.action?.trim()) newErrors.action = "Action is required";
-    if (!formData.request_payload?.trim()) newErrors.request_payload = "Payload cannot be empty";
+    if (!formData.request_payload?.trim())
+      newErrors.request_payload = "Payload cannot be empty";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -120,23 +123,40 @@ export default function CommandFormPage() {
     return "binary";
   }
 
-  if (loading) return <div className="p-8 animate-pulse text-slate-400">Loading Configuration...</div>;
+  if (loading)
+    return (
+      <div className="p-8 animate-pulse text-slate-400">
+        Loading Configuration...
+      </div>
+    );
 
   return (
     <div className="h-screen flex flex-col bg-slate-50/50">
       <header className="h-14 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
-          
+          <button
+            onClick={() => navigate(-1)}
+            className="group p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-indigo-600 transition-all border border-transparent hover:border-slate-200"
+            title="Back to list"
+          >
+            <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
+          </button>
         </div>
         <button
           onClick={handleSave}
           disabled={saving}
           className={cn(
             "bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 shadow-md transition-all",
-            saving ? "opacity-50 cursor-not-allowed" : "hover:bg-indigo-700 active:scale-95",
+            saving
+              ? "opacity-50 cursor-not-allowed"
+              : "hover:bg-indigo-700 active:scale-95",
           )}
         >
-          {saving ? <div className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+          {saving ? (
+            <div className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            <Save className="h-3.5 w-3.5" />
+          )}
           {saving ? "Saving..." : "Save Changes"}
         </button>
       </header>
@@ -148,7 +168,7 @@ export default function CommandFormPage() {
             <h2 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
               <Settings2 className="h-3.5 w-3.5" /> Identity & Metadata
             </h2>
-            
+
             <div className="space-y-4">
               {/* Name Field */}
               <div>
@@ -158,10 +178,14 @@ export default function CommandFormPage() {
                 <input
                   type="text"
                   value={formData.name || ""}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
                   className={cn(
                     "w-full mt-1 px-3 py-2 bg-slate-50 border rounded-xl text-sm outline-none transition-all",
-                    errors.name ? "border-red-500" : "border-slate-200 focus:ring-2 focus:ring-indigo-500/10"
+                    errors.name
+                      ? "border-red-500"
+                      : "border-slate-200 focus:ring-2 focus:ring-indigo-500/10",
                   )}
                 />
               </div>
@@ -174,10 +198,14 @@ export default function CommandFormPage() {
                 <input
                   type="text"
                   value={formData.command_key || ""}
-                  onChange={(e) => setFormData({ ...formData, command_key: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, command_key: e.target.value })
+                  }
                   className={cn(
                     "w-full mt-1 px-3 py-2 bg-slate-50 border rounded-xl text-sm font-mono outline-none transition-all",
-                    errors.command_key ? "border-red-500" : "border-slate-200 focus:ring-2 focus:ring-indigo-500/10"
+                    errors.command_key
+                      ? "border-red-500"
+                      : "border-slate-200 focus:ring-2 focus:ring-indigo-500/10",
                   )}
                 />
               </div>
@@ -190,7 +218,9 @@ export default function CommandFormPage() {
                 <div className="relative mt-1">
                   <select
                     value={formData.action || "view"}
-                    onChange={(e) => setFormData({ ...formData, action: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, action: e.target.value })
+                    }
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm appearance-none focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all cursor-pointer"
                   >
                     {categoryData?.command_actions ? (
@@ -200,7 +230,9 @@ export default function CommandFormPage() {
                         </option>
                       ))
                     ) : (
-                      <option value={formData.action}>{formData.action.toUpperCase()}</option>
+                      <option value={formData.action}>
+                        {formData.action.toUpperCase()}
+                      </option>
                     )}
                   </select>
                   <ChevronDown className="absolute right-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
@@ -209,10 +241,14 @@ export default function CommandFormPage() {
 
               {/* Description */}
               <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Description</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">
+                  Description
+                </label>
                 <textarea
                   value={formData.description || ""}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
                   className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm min-h-[80px] outline-none"
                 />
               </div>
@@ -221,14 +257,23 @@ export default function CommandFormPage() {
 
           {/* Injection Variables */}
           <div className="space-y-4 border-t pt-6">
-            <h2 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Injection Variables</h2>
+            <h2 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+              Injection Variables
+            </h2>
             <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-2">
-              {Object.entries(formData.system_params || {}).map(([key, value]) => (
-                <div key={key} className="flex items-center justify-between text-[11px]">
-                  <span className="font-mono text-slate-500">{key}</span>
-                  <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{String(value)}</span>
-                </div>
-              ))}
+              {Object.entries(formData.system_params || {}).map(
+                ([key, value]) => (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between text-[11px]"
+                  >
+                    <span className="font-mono text-slate-500">{key}</span>
+                    <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
+                      {String(value)}
+                    </span>
+                  </div>
+                ),
+              )}
             </div>
           </div>
         </section>
@@ -237,10 +282,26 @@ export default function CommandFormPage() {
         <section className="flex-1 flex flex-col overflow-hidden">
           <div className="h-12 bg-white border-b border-slate-200 px-4 flex items-center justify-between">
             <div className="flex gap-6">
-              <button onClick={() => setActiveView("code")} className={cn("flex items-center gap-2 text-[11px] font-bold uppercase transition-all border-b-2 h-12", activeView === "code" ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-400")}>
+              <button
+                onClick={() => setActiveView("code")}
+                className={cn(
+                  "flex items-center gap-2 text-[11px] font-bold uppercase transition-all border-b-2 h-12",
+                  activeView === "code"
+                    ? "border-indigo-600 text-indigo-600"
+                    : "border-transparent text-slate-400",
+                )}
+              >
                 <Code2 className="h-3.5 w-3.5" /> Payload Editor
               </button>
-              <button onClick={() => setActiveView("visual")} className={cn("flex items-center gap-2 text-[11px] font-bold uppercase transition-all border-b-2 h-12", activeView === "visual" ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-400")}>
+              <button
+                onClick={() => setActiveView("visual")}
+                className={cn(
+                  "flex items-center gap-2 text-[11px] font-bold uppercase transition-all border-b-2 h-12",
+                  activeView === "visual"
+                    ? "border-indigo-600 text-indigo-600"
+                    : "border-transparent text-slate-400",
+                )}
+              >
                 <Layout className="h-3.5 w-3.5" /> Parameter Architect
               </button>
             </div>
@@ -248,15 +309,27 @@ export default function CommandFormPage() {
 
           <div className="flex-1 overflow-y-auto p-6 bg-slate-50/30">
             {activeView === "code" ? (
-              <div className={cn("h-[calc(100vh-200px)] rounded-xl overflow-hidden border-2 transition-all", errors.request_payload ? "border-red-500/50" : "border-transparent")}>
+              <div
+                className={cn(
+                  "h-[calc(100vh-200px)] rounded-xl overflow-hidden border-2 transition-all",
+                  errors.request_payload
+                    ? "border-red-500/50"
+                    : "border-transparent",
+                )}
+              >
                 <ProtocolEditor
                   template={formData.request_payload || ""}
                   language={getCategoryFormat(formData.category_slug)}
-                  onChange={(val: any) => setFormData({ ...formData, request_payload: val })}
+                  onChange={(val: any) =>
+                    setFormData({ ...formData, request_payload: val })
+                  }
                 />
               </div>
             ) : (
-              <ParameterTree parameters={visualizedParameters} onChange={() => {}} />
+              <ParameterTree
+                parameters={visualizedParameters}
+                onChange={() => {}}
+              />
             )}
           </div>
         </section>

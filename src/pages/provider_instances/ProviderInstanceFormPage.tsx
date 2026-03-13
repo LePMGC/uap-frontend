@@ -1,7 +1,7 @@
 // src/pages/management/ProviderInstanceFormPage.tsx
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Save } from "lucide-react";
+import { ArrowLeft, Save } from "lucide-react";
 import { providerInstanceService } from "@/services/providerInstanceService";
 import { useToastStore } from "@/hooks/useToastStore";
 import { ProviderInstanceForm } from "@/components/management/ProviderInstanceForm";
@@ -114,20 +114,34 @@ export default function ProviderInstanceFormPage() {
       {/* Form wrapper handles "Enter" key and accessibility */}
       <form ref={formRef} onSubmit={(e) => e.preventDefault()}>
         <div className="flex items-end justify-between mb-8 pb-6 border-b border-slate-100">
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-              {isEdit ? "Edit Provider Instance" : "Configure New Instance"}
-            </h1>
-            <p className="text-xs text-slate-500 mt-1">
-              Manage connection credentials and network parameters.
-            </p>
+          <div className="flex items-center gap-4">
+            {/* Uniform Back Button: matches the height of the Save button */}
+            <button
+              type="button"
+              onClick={() => navigate("/providers-instances")}
+              className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-900 transition-all border border-slate-200 shadow-sm"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+
+            <div>
+              <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+                {isEdit ? "Edit Provider Instance" : "Configure New Instance"}
+              </h1>
+              {/* Increased font size for subtitle as requested previously */}
+              <p className="text-xs text-slate-500 mt-1">
+                Manage connection credentials and network parameters.
+              </p>
+            </div>
           </div>
-          <div className="flex gap-3">
+
+          <div className="flex items-center gap-3">
+            {/* Secondary Action: "Test Settings" / "Ping" */}
             <button
               type="button"
               onClick={handleConnectivityCheck}
               disabled={!category || isTesting}
-              className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-50 disabled:opacity-50 transition-all"
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg font-bold text-[13px] hover:bg-slate-50 disabled:opacity-50 transition-all shadow-sm"
             >
               {isTesting
                 ? "Checking..."
@@ -135,12 +149,14 @@ export default function ProviderInstanceFormPage() {
                   ? "Ping Instance"
                   : "Test Settings"}
             </button>
+
+            {/* Primary Action: "Save" */}
             <button
               type="button"
               onClick={handleSave}
-              className="flex items-center gap-2 px-8 py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all shadow-lg"
+              className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-lg font-bold text-[13px] hover:bg-slate-800 transition-all shadow-md active:scale-95"
             >
-              <Save className="h-4 w-4" />{" "}
+              <Save className="h-3.5 w-3.5" />
               {isEdit ? "Update Instance" : "Save Instance"}
             </button>
           </div>

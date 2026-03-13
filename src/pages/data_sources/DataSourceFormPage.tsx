@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Save, Send } from "lucide-react";
+import { ArrowLeft, Save, Send } from "lucide-react";
 import { dataSourceService } from "@/services/dataSourceService";
 import { useToastStore } from "@/hooks/useToastStore";
 import { DataSourceConnectionForm } from "@/components/management/DataSourceConnectionForm";
@@ -64,34 +64,51 @@ export default function DataSourceFormPage() {
 
   return (
     <div className="p-8 max-w-[1600px] mx-auto animate-in fade-in duration-500">
-      <div className="flex items-end justify-between mb-8 pb-6 border-b border-slate-100">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-            {isEdit ? "Edit Data Source" : "Create Data Source"}
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Configure how the system connects to your external data provider.
-          </p>
-        </div>
-        <div className="flex gap-3">
+      <div className="flex items-center justify-between mb-8 pb-6 border-b border-slate-100">
+        <div className="flex items-center gap-4">
+          {/* Uniform Back Button */}
           <button
+            type="button"
+            onClick={() => navigate("/data-sources")}
+            className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-900 transition-all border border-slate-200 shadow-sm"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+
+          <div>
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+              {isEdit ? "Edit Data Source" : "Create Data Source"}
+            </h1>
+            <p className="text-xs text-slate-500 mt-1">
+              Configure how the system connects to your external data provider.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {/* Standardized Secondary Action */}
+          <button
+            type="button"
             onClick={handleTestConnection}
             disabled={!type || isTesting}
-            className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg font-bold text-[13px] hover:bg-slate-50 transition-all disabled:opacity-50 shadow-sm"
           >
             {isTesting ? (
               "Testing..."
             ) : (
               <>
-                <Send className="h-4 w-4" /> Test Connection
+                <Send className="h-3.5 w-3.5" /> Test Connection
               </>
             )}
           </button>
+
+          {/* Standardized Primary Action */}
           <button
+            type="button"
             onClick={handleSave}
-            className="flex items-center gap-2 px-8 py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
+            className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-lg font-bold text-[13px] hover:bg-slate-800 transition-all shadow-md active:scale-95"
           >
-            <Save className="h-4 w-4" />{" "}
+            <Save className="h-3.5 w-3.5" />
             {isEdit ? "Update Source" : "Save Source"}
           </button>
         </div>

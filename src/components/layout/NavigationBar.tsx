@@ -48,7 +48,7 @@ export function NavigationBar() {
             )}
           >
             <Icon className="h-3.5 w-3.5" />
-            <span className="truncate max-w-[100px]">{tab.title}</span>
+            <span className="truncate max-w-[100px] text-sm">{tab.title}</span>
 
             {/* Close Icon - Only show if more than 1 tab or not dashboard */}
             {tab.id !== "dashboard" && (
