@@ -11,9 +11,13 @@ import DeleteConfirmationModal from "@/components/management/DeleteConfirmationM
 
 interface CommandGridProps {
   categorySlug: string;
+  availableActions: string[]; // Add this to the interface
 }
 
-export function CommandGrid({ categorySlug }: CommandGridProps) {
+export function CommandGrid({
+  categorySlug,
+  availableActions,
+}: CommandGridProps) {
   const { showToast } = useToastStore();
   const navigate = useNavigate();
 
@@ -73,10 +77,6 @@ export function CommandGrid({ categorySlug }: CommandGridProps) {
   useEffect(() => {
     fetchCommands();
   }, [categorySlug, currentPage, pageSize, searchQuery, actionFilter]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [categorySlug]);
 
   // Trigger delete modal
   const handleDeleteTrigger = (item: any) => {
@@ -146,18 +146,16 @@ export function CommandGrid({ categorySlug }: CommandGridProps) {
     },
   ];
 
+  // Map the API actions to the format required by GenericDataTable
   const filterConfigs = [
     {
       id: "action",
       label: "All Actions",
       value: actionFilter,
-      options: [
-        { label: "View", value: "view" },
-        { label: "Create", value: "create" },
-        { label: "Update", value: "update" },
-        { label: "Delete", value: "delete" },
-        { label: "Run", value: "run" },
-      ],
+      options: availableActions.map((action) => ({
+        label: action.charAt(0).toUpperCase() + action.slice(1), // Capitalize (e.g., 'view' -> 'View')
+        value: action,
+      })),
       onChange: (val: string) => {
         setActionFilter(val);
         setCurrentPage(1);
@@ -220,8 +218,9 @@ export function CommandGrid({ categorySlug }: CommandGridProps) {
         entityName={commandToDelete?.name || ""}
         description={
           <p>
-            You are about to permanently delete the command <b>{commandToDelete?.name}</b>.
-            This will remove its protocol mapping and cannot be undone.
+            You are about to permanently delete the command{" "}
+            <b>{commandToDelete?.name}</b>. This will remove its protocol
+            mapping and cannot be undone.
           </p>
         }
         onConfirm={handleConfirmDelete}

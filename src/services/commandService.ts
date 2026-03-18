@@ -41,4 +41,9 @@ export const commandService = {
     const response = await api.delete(`/management/commands/${id}`);
     return response.data;
   },
+
+  getCommandTree: async () => {
+    const response = await api.get("/management/commands/tree");
+    return response.data;
+  },
 };

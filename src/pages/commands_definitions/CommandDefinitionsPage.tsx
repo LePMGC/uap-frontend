@@ -9,6 +9,7 @@ interface ProviderCategory {
   request_format: string;
   response_format: string;
   command_count: number;
+  command_actions: string[];
 }
 
 export default function CommandDefinitionsPage() {
@@ -18,9 +19,12 @@ export default function CommandDefinitionsPage() {
   useEffect(() => {
     commandService.getCategories().then((data) => {
       setCategories(data);
-      if (data.length > 0) setActiveTab(data[0].slug); // Updated to .slug
+      if (data.length > 0) setActiveTab(data[0].slug);
     });
   }, []);
+
+  // Find the current active category object to get its command_actions
+  const activeCategory = categories.find((cat) => cat.slug === activeTab);
 
   // Helper to format slugs like 'ericsson-ucip' to 'ERICSSON UCIP'
   const formatLabel = (slug: string) => slug.replace(/-/g, " ").toUpperCase();
@@ -58,7 +62,13 @@ export default function CommandDefinitionsPage() {
       </div>
 
       {/* Grid View */}
-      {activeTab && <CommandGrid categorySlug={activeTab} />}
+      {activeTab && (
+        <CommandGrid
+          key={activeTab}
+          categorySlug={activeTab}
+          availableActions={activeCategory?.command_actions || []}
+        />
+      )}
     </div>
   );
 }
