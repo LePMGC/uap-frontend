@@ -12,6 +12,13 @@ export const providerInstanceService = {
     return response.data;
   },
 
+  getAllbyCategory: async (categorySlug: string) => {
+    const response = await api.get(
+      `/management/instances/category/${categorySlug}`,
+    );
+    return response.data;
+  },
+
   getById: async (id: number | string) => {
     const response = await api.get(`/management/instances/${id}`);
     return response.data;

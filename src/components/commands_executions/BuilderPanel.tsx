@@ -1,24 +1,17 @@
 import { useState, useEffect } from "react";
-import {
-  RotateCcw,
-  Copy,
-  Braces,
-  FormInput,
-  Loader2,
-  CheckCircle2,
-  Terminal,
-  Layers,
-} from "lucide-react";
+import { Braces, FormInput, Loader2, Terminal, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { commandService } from "@/services/commandService";
 import { ProtocolEditor } from "../management/ProtocolEditor";
 
 interface BuilderPanelProps {
   selectedCommandSummary: any;
+  onStateChange: (state: { mode: "form" | "raw"; data: any }) => void;
 }
 
 export default function BuilderPanel({
   selectedCommandSummary,
+  onStateChange,
 }: BuilderPanelProps) {
   const [activeTab, setActiveTab] = useState<"form" | "raw">("form");
   const [loading, setLoading] = useState(false);
@@ -76,6 +69,14 @@ export default function BuilderPanel({
       setPreviewPayload(preview);
     }
   }, [formValues, details]);
+
+  useEffect(() => {
+    // Whenever formValues or previewPayload changes, notify the parent
+    onStateChange({
+      mode: activeTab,
+      data: activeTab === "form" ? formValues : previewPayload,
+    });
+  }, [activeTab, formValues, previewPayload]);
 
   // --- UTILS ---
   function flattenObject(obj: any, prefix = "") {

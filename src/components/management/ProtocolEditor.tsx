@@ -29,7 +29,7 @@ export function ProtocolEditor({
       <Editor
         height="100%"
         defaultLanguage={getLanguage(language)}
-        theme="vs-dark"
+        theme="vs-light"
         value={template}
         onChange={onChange}
         options={{

@@ -46,4 +46,9 @@ export const commandService = {
     const response = await api.get("/management/commands/tree");
     return response.data;
   },
+
+  execute: async (data: any) => {
+    const response = await api.post("/command-logs", data);
+    return response.data;
+  },
 };

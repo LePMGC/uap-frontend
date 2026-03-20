@@ -1,13 +1,65 @@
-import { useState, useCallback, useRef } from "react";
-import { PanelLeft, Play, ChevronRight, Search, Clock } from "lucide-react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import {
+  PanelLeft,
+  Play,
+  ChevronRight,
+  Search,
+  Loader2,
+  Server,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import CommandTree from "@/components/commands_executions/CommandTree";
 import BuilderPanel from "@/components/commands_executions/BuilderPanel";
 import ResultsPanel from "@/components/commands_executions/ResultsPanel";
+import { commandService } from "@/services/commandService";
+import { providerInstanceService } from "@/services/providerInstanceService";
 
 export default function CommandExecutionPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [selectedCommand, setSelectedCommand] = useState<any>(null);
+  const [executionData, setExecutionData] = useState({
+    mode: "form",
+    data: {},
+  });
+  const [isExecuting, setIsExecuting] = useState(false);
+
+  // --- INSTANCE SELECTION STATE ---
+  const [instances, setInstances] = useState<any[]>([]);
+  const [selectedInstanceId, setSelectedInstanceId] = useState<string | number>(
+    "",
+  );
+  const [isLoadingInstances, setIsLoadingInstances] = useState(false);
+  const [lastResult, setLastResult] = useState<any>(null);
+
+  // --- FETCH INSTANCES ON COMMAND SELECTION ---
+  useEffect(() => {
+    if (!selectedCommand?.category_slug) {
+      setInstances([]);
+      setSelectedInstanceId("");
+      return;
+    }
+
+    const fetchInstances = async () => {
+      setIsLoadingInstances(true);
+      try {
+        const data = await providerInstanceService.getAllbyCategory(
+          selectedCommand.category_slug,
+        );
+        setInstances(data);
+        if (data.length > 0) {
+          setSelectedInstanceId(data[0].id);
+        } else {
+          setSelectedInstanceId("");
+        }
+      } catch (error) {
+        console.error("Failed to load provider instances", error);
+      } finally {
+        setIsLoadingInstances(false);
+      }
+    };
+
+    fetchInstances();
+  }, [selectedCommand?.category_slug]);
 
   // --- RESIZING LOGIC ---
   const [resultsWidth, setResultsWidth] = useState(500);
@@ -38,6 +90,33 @@ export default function CommandExecutionPage() {
     }
   }, []);
 
+  const handleRun = async () => {
+    if (!selectedInstanceId) return;
+
+    setIsExecuting(true);
+    try {
+      const requestPayload = {
+        command_id: selectedCommand.id,
+        instance_id: selectedInstanceId,
+        mode: executionData.mode,
+        payload: executionData.data,
+      };
+
+      const response = await commandService.execute(requestPayload);
+
+      // FIX: Update the state with the nested 'data' object from your payload
+      if (response && response.data) {
+        setLastResult(response.data);
+      } else {
+        setLastResult(response);
+      }
+    } catch (error) {
+      console.error("Execution failed", error);
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
   return (
     <div className="h-full flex flex-col overflow-hidden bg-white">
       {/* 1. TOP NAV BAR */}
@@ -57,19 +136,16 @@ export default function CommandExecutionPage() {
 
           {/* DYNAMIC BREADCRUMB */}
           <div className="flex items-center gap-2 text-[13px] min-w-0">
-            {/* Replaced "Execution Builder" with category_slug */}
-            <span className="text-[11px] font-bold text-slate-700 uppercase tracking-tight">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">
               {selectedCommand?.category_slug || "Provider Category"}
             </span>
 
             <ChevronRight className="h-3 w-3 text-slate-300 shrink-0 hidden sm:inline" />
 
             <div className="flex items-center gap-1.5 truncate">
-              {/* Command Name (Bold) */}
               <span className="font-bold text-slate-900 tracking-tight">
                 {selectedCommand?.name || "Select Command"}
               </span>
-              {/* Command Key (Normal weight in brackets) */}
               {selectedCommand?.command_key && (
                 <span className="text-slate-400 font-normal">
                   ({selectedCommand.command_key})
@@ -77,36 +153,61 @@ export default function CommandExecutionPage() {
               )}
             </div>
           </div>
+        </div>
 
-          {/* LAST RUN STATUS SECTION */}
+        {/* 2. INSTANCE SELECTION & RUN BUTTON */}
+        <div className="flex items-center gap-4 pl-4 shrink-0">
           {selectedCommand && (
-            <div className="hidden lg:flex items-center gap-3 ml-4 pl-4 border-l border-slate-200 shrink-0">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                Last Run:
-              </span>
-              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-50 rounded-full border border-green-100">
-                <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                <span className="text-[10px] font-bold text-green-700 uppercase">
-                  Success
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 text-slate-400">
-                <Clock className="h-3 w-3" />
-                <span className="text-[11px] font-medium italic">10m ago</span>
+            <div className="flex items-center gap-2">
+              <div className="relative group">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
+                  {isLoadingInstances ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
+                  ) : (
+                    <Server className="h-3.5 w-3.5 text-slate-400" />
+                  )}
+                </div>
+                <select
+                  value={selectedInstanceId}
+                  onChange={(e) => setSelectedInstanceId(e.target.value)}
+                  className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all appearance-none min-w-[180px]"
+                >
+                  {instances.length === 0 && !isLoadingInstances && (
+                    <option value="">No instances available</option>
+                  )}
+                  {instances.map((inst) => (
+                    <option key={inst.id} value={inst.id}>
+                      {inst.is_active ? "🟢" : "🔴"} {inst.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <ChevronRight className="h-3 w-3 text-slate-400 rotate-90" />
+                </div>
               </div>
             </div>
           )}
-        </div>
 
-        <div className="flex items-center gap-3 pl-4 shrink-0">
-          <button className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold text-[13px] hover:bg-indigo-700 transition-all shadow-md active:scale-95 shadow-indigo-100">
-            <Play className="h-3.5 w-3.5 fill-current" />
+          <button
+            onClick={handleRun}
+            disabled={!selectedInstanceId || isExecuting}
+            className={cn(
+              "flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold text-[13px] hover:bg-indigo-700 transition-all shadow-md active:scale-95 shadow-indigo-100",
+              (!selectedInstanceId || isExecuting) &&
+                "opacity-50 cursor-not-allowed",
+            )}
+          >
+            {isExecuting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Play className="h-3.5 w-3.5 fill-current" />
+            )}
             Run
           </button>
         </div>
       </header>
 
-      {/* 2. MAIN CONTENT AREA */}
+      {/* 3. MAIN CONTENT AREA */}
       <main className="flex-1 flex overflow-hidden">
         {/* LEFT: SIDEBAR */}
         <aside
@@ -133,7 +234,10 @@ export default function CommandExecutionPage() {
 
         {/* CENTER (Builder) & RIGHT (Results) */}
         <div className="flex-1 flex min-w-0 bg-slate-100 overflow-hidden">
-          <BuilderPanel selectedCommandSummary={selectedCommand} />
+          <BuilderPanel
+            selectedCommandSummary={selectedCommand}
+            onStateChange={setExecutionData}
+          />
 
           {/* Draggable Divider */}
           <div
@@ -144,7 +248,7 @@ export default function CommandExecutionPage() {
             <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-slate-200 group-hover:bg-indigo-400 transition-colors z-20" />
           </div>
 
-          <ResultsPanel width={resultsWidth} />
+          <ResultsPanel width={resultsWidth} results={lastResult} />
         </div>
       </main>
     </div>
