@@ -21,9 +21,9 @@ interface ResultsPanelProps {
 }
 
 export default function ResultsPanel({ width, results }: ResultsPanelProps) {
-  const [activeTab, setActiveTab] = useState<"outputs" | "raw" | "metadata">(
-    "outputs",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "outputs" | "raw_request" | "raw" | "metadata"
+  >("outputs");
 
   if (!results) {
     return (
@@ -37,9 +37,9 @@ export default function ResultsPanel({ width, results }: ResultsPanelProps) {
     );
   }
 
+  // Destructure based on your new BE Resource structure
   const { payloads, result, command_info, executed_by, metadata } = results;
 
-  // Simple formatter for the timestamp
   const formatExecutionDate = (ts: string) => {
     if (!ts) return "N/A";
     const date = new Date(ts);
@@ -51,12 +51,10 @@ export default function ResultsPanel({ width, results }: ResultsPanelProps) {
     });
   };
 
-  const formatRawResponse = (raw: string, format: string) => {
+  const formatRawContent = (raw: string, format: string) => {
     if (!raw) return "";
-
     try {
       if (format?.toLowerCase() === "xml") {
-        // Basic XML Prettifier logic
         let formatted = "";
         let indent = "";
         const tab = "  ";
@@ -67,15 +65,13 @@ export default function ResultsPanel({ width, results }: ResultsPanelProps) {
         });
         return formatted.substring(1, formatted.length - 3);
       }
-
       if (format?.toLowerCase() === "json") {
         return JSON.stringify(JSON.parse(raw), null, 2);
       }
     } catch (e) {
       console.error("Formatting failed", e);
     }
-
-    return raw; // Fallback to raw if formatting fails
+    return raw;
   };
 
   return (
@@ -86,7 +82,6 @@ export default function ResultsPanel({ width, results }: ResultsPanelProps) {
       {/* 1. TOP HEADER STATS */}
       <div className="h-12 border-b border-slate-100 flex items-center justify-between px-4 shrink-0 bg-slate-50/50">
         <div className="flex items-center gap-4">
-          {/* Status Indicator */}
           <div className="flex items-center gap-1.5">
             {result?.is_successful ? (
               <CheckCircle2 className="h-4 w-4 text-emerald-500" />
@@ -103,15 +98,13 @@ export default function ResultsPanel({ width, results }: ResultsPanelProps) {
             </span>
           </div>
 
-          {/* Execution Time (Dynamic) */}
           <div className="flex items-center gap-1.5 text-slate-500 border-l border-slate-200 pl-4">
             <Clock className="h-3.5 w-3.5" />
             <span className="text-[10px] font-bold tracking-tight">
-              {metadata?.execution_time ? `${metadata.execution_time}` : "---"}
+              {metadata?.execution_time || "---"}
             </span>
           </div>
 
-          {/* Execution Date/Time (New) */}
           <div className="flex items-center gap-1.5 text-slate-400">
             <span className="text-[10px] font-medium">
               {formatExecutionDate(metadata?.timestamp)}
@@ -133,7 +126,8 @@ export default function ResultsPanel({ width, results }: ResultsPanelProps) {
       <div className="flex border-b border-slate-100 px-2 bg-white shrink-0">
         {[
           { id: "outputs", label: "Outputs", icon: FileJson },
-          { id: "raw", label: "Raw Response", icon: Code2 },
+          { id: "raw_request", label: "Raw Request", icon: Code2 },
+          { id: "raw", label: "Raw Response", icon: Database },
           { id: "metadata", label: "Metadata", icon: Info },
         ].map((tab) => (
           <button
@@ -155,63 +149,95 @@ export default function ResultsPanel({ width, results }: ResultsPanelProps) {
       {/* 3. TAB CONTENT */}
       <div className="flex-1 overflow-hidden relative bg-white">
         {activeTab === "outputs" && (
-          <div className="h-full overflow-auto p-4 custom-json-container">
-            <div className="mb-4 flex gap-2">
+          <div className="h-full overflow-auto p-4 custom-json-container space-y-6">
+            <div className="flex gap-2">
               <span
                 className={cn(
-                  "px-2 py-1 rounded text-[10px] font-bold border transition-colors",
+                  "px-2 py-1 rounded text-[10px] font-bold border",
                   result?.is_successful
                     ? "bg-emerald-50 text-emerald-700 border-emerald-100"
                     : "bg-rose-50 text-rose-700 border-rose-100",
                 )}
               >
-                CODE: {payloads?.response?.code ?? 0}
+                CODE:{" "}
+                {payloads?.response?.code || result?.response_code || "ERR"}
               </span>
-              <span className="px-2 py-1 bg-slate-50 text-slate-500 rounded text-[10px] font-bold border border-slate-100">
-                {payloads?.response?.message || "Success"}
+              <span
+                className={cn(
+                  "px-2 py-1 rounded text-[10px] font-bold border",
+                  result?.is_successful
+                    ? "bg-slate-50 text-slate-500 border-slate-100"
+                    : "bg-rose-50 text-rose-600 border-rose-100",
+                )}
+              >
+                {payloads?.response?.message ||
+                  (result?.is_successful ? "Success" : "Execution Failed")}
               </span>
             </div>
 
-            <JsonView
-              src={payloads?.response?.data || {}}
-              dark={false}
-              theme="default"
-              customizeNode={(params) => {
-                if (params.indexOrName === "success" && params.node === true) {
-                  return (
-                    <span style={{ color: "#10b981", fontWeight: "bold" }}>
-                      true ✅
-                    </span>
-                  );
-                }
-                return undefined;
-              }}
-              displaySize={true}
-              enableClipboard={true}
-              collapsed={1}
-            />
+            <section>
+              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                <Code2 className="h-3 w-3" /> Form Request Data
+              </h4>
+              <div className="bg-slate-50 rounded-lg border border-slate-100 p-2">
+                <JsonView
+                  src={payloads?.request?.data || {}}
+                  collapsed={false}
+                  enableClipboard={true}
+                />
+              </div>
+            </section>
+
+            <section>
+              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                <Database className="h-3 w-3" /> Response Data
+              </h4>
+              <div className="bg-white rounded-lg border border-slate-100 p-2">
+                <JsonView
+                  src={payloads?.response?.data || {}}
+                  collapsed={1}
+                  enableClipboard={true}
+                />
+              </div>
+            </section>
           </div>
         )}
 
-        {activeTab === "raw" && (
+        {activeTab === "raw_request" && (
           <Editor
             height="100%"
-            // Dynamically set language based on metadata
             language={
               metadata?.format?.toLowerCase() === "xml" ? "xml" : "json"
             }
             theme="vs-light"
-            // Apply the formatting here
-            value={formatRawResponse(payloads?.response?.raw, metadata?.format)}
+            value={formatRawContent(payloads?.request?.raw, metadata?.format)}
             options={{
               readOnly: true,
               minimap: { enabled: false },
               fontSize: 12,
               lineNumbers: "on",
-              scrollBeyondLastLine: false,
               wordWrap: "on",
-              folding: true, // Allows collapsing/expanding nodes
-              formatOnPaste: true,
+              folding: true,
+              automaticLayout: true,
+            }}
+          />
+        )}
+
+        {activeTab === "raw" && (
+          <Editor
+            height="100%"
+            language={
+              metadata?.format?.toLowerCase() === "xml" ? "xml" : "json"
+            }
+            theme="vs-light"
+            value={formatRawContent(payloads?.response?.raw, metadata?.format)}
+            options={{
+              readOnly: true,
+              minimap: { enabled: false },
+              fontSize: 12,
+              lineNumbers: "on",
+              wordWrap: "on",
+              folding: true,
               automaticLayout: true,
             }}
           />
@@ -255,21 +281,12 @@ export default function ResultsPanel({ width, results }: ResultsPanelProps) {
         )}
       </div>
 
-      {/* 4. TSX COMPLIANT GLOBAL STYLES */}
       <style
         dangerouslySetInnerHTML={{
           __html: `
-        .custom-json-container .rjve-container {
-          font-family: 'JetBrains Mono', monospace !important;
-          font-size: 13px !important;
-          line-height: 1.6 !important;
-        }
-        .custom-json-container .rjve-key {
-          color: #64748b !important; /* slate-500 */
-        }
-        .custom-json-container .rjve-value-string {
-          color: #4f46e5 !important; /* indigo-600 */
-        }
+        .custom-json-container .rjve-container { font-family: 'JetBrains Mono', monospace !important; font-size: 13px !important; }
+        .custom-json-container .rjve-key { color: #64748b !important; }
+        .custom-json-container .rjve-value-string { color: #4f46e5 !important; }
       `,
         }}
       />
@@ -277,7 +294,6 @@ export default function ResultsPanel({ width, results }: ResultsPanelProps) {
   );
 }
 
-// Small Meta card component
 function MetaCard({
   label,
   value,

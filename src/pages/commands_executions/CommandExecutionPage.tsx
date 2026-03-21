@@ -61,6 +61,12 @@ export default function CommandExecutionPage() {
     fetchInstances();
   }, [selectedCommand?.category_slug]);
 
+  useEffect(() => {
+    if (selectedCommand) {
+      setLastResult(null);
+    }
+  }, [selectedCommand?.id]);
+
   // --- RESIZING LOGIC ---
   const [resultsWidth, setResultsWidth] = useState(500);
   const isResizing = useRef(false);
@@ -91,7 +97,10 @@ export default function CommandExecutionPage() {
   }, []);
 
   const handleRun = async () => {
-    if (!selectedInstanceId) return;
+    if (!selectedInstanceId) {
+      alert("Please select a provider instance first.");
+      return;
+    }
 
     setIsExecuting(true);
     try {
@@ -104,14 +113,32 @@ export default function CommandExecutionPage() {
 
       const response = await commandService.execute(requestPayload);
 
-      // FIX: Update the state with the nested 'data' object from your payload
-      if (response && response.data) {
-        setLastResult(response.data);
-      } else {
-        setLastResult(response);
-      }
-    } catch (error) {
+      // Laravel Resource usually returns { data: { id, payloads, ... } }
+      // We want the inner data object
+      const finalData = response?.data?.data || response?.data || response;
+      setLastResult(finalData);
+    } catch (error: any) {
       console.error("Execution failed", error);
+
+      // Try to extract the log data from the error response
+      const errorData = error.response?.data?.data || error.response?.data;
+
+      if (errorData && errorData.payloads) {
+        setLastResult(errorData);
+      } else {
+        // Manual fallback if server fails completely
+        setLastResult({
+          result: { is_successful: false },
+          payloads: {
+            request: { data: executionData.data, raw: "" },
+            response: {
+              message: error.message,
+              code: error.response?.status || 500,
+            },
+          },
+          metadata: { timestamp: new Date().toISOString() },
+        });
+      }
     } finally {
       setIsExecuting(false);
     }
