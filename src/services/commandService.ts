@@ -42,13 +42,38 @@ export const commandService = {
     return response.data;
   },
 
-  getCommandTree: async () => {
-    const response = await api.get("/management/commands/tree");
+  getCommandTree: async (search?: string) => {
+    // Pass the search string as a query parameter
+    const response = await api.get("/management/commands/tree", {
+      params: { search },
+    });
     return response.data;
   },
 
   execute: async (data: any) => {
     const response = await api.post("/command-logs", data);
     return response.data;
+  },
+
+  /**
+   * Fetches paginated command logs with optional filters
+   * @param params { page, per_page, search, status, category_slug }
+   */
+  getCommandLogs: async (page = 1, limit = 5, filters: any = {}) => {
+    const params = {
+      page,
+      per_page: limit,
+      ...filters,
+    };
+
+    const response = await api.get("/command-logs", { params });
+    return response.data;
+  },
+
+  // src/services/commandService.ts
+  getLogById: async (id: string) => {
+    const response = await api.get(`/command-logs/${id}`);
+    // Unwrap the nested 'data' property from the BE response
+    return response.data.data;
   },
 };

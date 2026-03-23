@@ -11,6 +11,7 @@ import {
   UserCircle,
   LogOut,
   ChevronRight,
+  ListFilter,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { cn } from "@/lib/utils";
@@ -29,8 +30,9 @@ const menuGroups = [
       PERM.VIEW_BATCH_TEMPLATES ||
       PERM.VIEW_BATCH_INSTANCES,
     items: [
-      { name: "Dashboard", icon: LayoutDashboard, url: "/dashboard" }, // Added URLs
+      { name: "Dashboard", icon: LayoutDashboard, url: "/dashboard" },
       { name: "Single Execution", icon: PlayCircle, url: "/single-execution" },
+      { name: "Command Logs", icon: ListFilter, url: "/commands-logs" },
       { name: "Batch Jobs", icon: Layers, url: "/batches" },
       { name: "Monitoring", icon: Activity, url: "/monitoring" },
     ],
