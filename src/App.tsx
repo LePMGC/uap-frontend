@@ -17,6 +17,8 @@ import CommandDefinitionsPage from "./pages/commands_definitions/CommandDefiniti
 import CommandFormPage from "./pages/commands_definitions/CommandFormPage";
 import CommandExecutionPage from "./pages/commands_executions/CommandExecutionPage";
 import CommandLogsPage from "./pages/commands_logs/CommandLogsPage";
+import BatchJobsPage from "./pages/batch_jobs/BatchJobsPage";
+import CreateBatchJobPage from "./pages/batch_jobs/wizard";
 
 export default function App() {
   const { isAuthenticated, needsPasswordChange } = useAuthStore();
@@ -89,6 +91,10 @@ export default function App() {
           <Route path="/single-execution" element={<CommandExecutionPage />} />
 
           <Route path="/commands-logs" element={<CommandLogsPage />} />
+
+          <Route path="/batch-jobs" element={<BatchJobsPage />} />
+
+          <Route path="/batch-jobs/create" element={<CreateBatchJobPage />} />
 
           {/* 2. Catch-all for the protected area (the very last item in this block) */}
           <Route index element={<Navigate to="/dashboard" replace />} />

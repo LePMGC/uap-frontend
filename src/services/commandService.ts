@@ -21,6 +21,13 @@ export const commandService = {
     return response.data;
   },
 
+  getCommandsByCategory: async (category_slug: string) => {
+    const response = await api.get("/management/commands", {
+      params: { category: category_slug, per_page: 1000 },
+    });
+    return response.data.data; // ✅
+  },
+
   // Fetches one command
   getOneCommand: async (id: number | string) => {
     const response = await api.get(`/management/commands/${id}`);

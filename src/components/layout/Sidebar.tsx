@@ -33,7 +33,7 @@ const menuGroups = [
       { name: "Dashboard", icon: LayoutDashboard, url: "/dashboard" },
       { name: "Single Execution", icon: PlayCircle, url: "/single-execution" },
       { name: "Command Logs", icon: ListFilter, url: "/commands-logs" },
-      { name: "Batch Jobs", icon: Layers, url: "/batches" },
+      { name: "Batch Jobs", icon: Layers, url: "/batch-jobs" },
       { name: "Monitoring", icon: Activity, url: "/monitoring" },
     ],
   },
