@@ -12,13 +12,13 @@ import { commandService } from "@/services/commandService";
 import { cn } from "@/lib/utils";
 
 // UI Components
-import { CommandSelect } from "@/components/ui/batch-jobs/CommandSelect";
-import { DataPreviewPanel } from "@/components/ui/batch-jobs/DataPreviewPanel";
-import { FileUploadSource } from "@/components/ui/batch-jobs/sources/FileUploadSource";
-import { DatabaseSource } from "@/components/ui/batch-jobs/sources/DatabaseSource";
+import { CommandSelect } from "@/components/batch-jobs/CommandSelect";
+import { DataPreviewPanel } from "@/components/batch-jobs/DataPreviewPanel";
+import { FileUploadSource } from "@/components/batch-jobs/sources/FileUploadSource";
+import { DatabaseSource } from "@/components/batch-jobs/sources/DatabaseSource";
 
-import { APISource } from "@/components/ui/batch-jobs/sources/APISource";
-import { SFTPSource } from "@/components/ui/batch-jobs/sources/SFTPSource";
+import { APISource } from "@/components/batch-jobs/sources/APISource";
+import { SFTPSource } from "@/components/batch-jobs/sources/SFTPSource";
 
 interface Step1Props {
   data: any;

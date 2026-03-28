@@ -7,10 +7,13 @@ import { Step1BasicInfo } from "./Step1BasicInfo";
 import { Step2DataMapping } from "./Step2DataMapping";
 import { Step3Scheduling } from "./Step3Scheduling";
 import { Step4Review } from "./Step4Review";
+import { SuccessModal } from "@/components/batch-jobs/SuccessModal";
 
 export default function CreateBatchJobPage() {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [createdJobId, setCreatedJobId] = useState("");
 
   const [formData, setFormData] = useState({
     name: "",
@@ -30,7 +33,20 @@ export default function CreateBatchJobPage() {
     { id: 4, title: "Review" },
   ];
 
-  const handleNext = () => setCurrentStep((prev) => Math.min(prev + 1, 4));
+  const handleNext = () => {
+    if (currentStep < 4) {
+      setCurrentStep((prev) => prev + 1);
+    } else {
+      // 🟢 HANDLE FINALIZATION
+      handleFinalize();
+    }
+  };
+
+  const handleFinalize = async () => {
+    const mockUuid = crypto.randomUUID();
+    setCreatedJobId(mockUuid);
+    setIsSuccessModalOpen(true);
+  };
   const handleBack = () => setCurrentStep((prev) => Math.max(prev - 1, 1));
 
   const updateFormData = (newData: Partial<typeof formData>) => {
@@ -132,6 +148,13 @@ export default function CreateBatchJobPage() {
           </div>
         </div>
       </div>
+
+      {/* 4. Add the Modal Component */}
+      <SuccessModal
+        isOpen={isSuccessModalOpen}
+        jobId={createdJobId}
+        jobName={formData.name}
+      />
     </div>
   );
 }

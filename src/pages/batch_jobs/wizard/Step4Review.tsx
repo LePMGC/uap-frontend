@@ -90,15 +90,6 @@ export function Step4Review({ data, goToStep }: Step4Props) {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="space-y-1">
-        <h2 className="text-xl font-bold text-slate-900">
-          Step 4: Review & Confirm
-        </h2>
-        <p className="text-xs text-slate-500">
-          Review your configuration and confirm to create your batch job.
-        </p>
-      </div>
-
       <div className="grid gap-5">
         {/* SECTION 1: SOURCE & COMMAND */}
         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">

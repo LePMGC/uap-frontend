@@ -5,7 +5,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Save, Send } from "lucide-react";
 import { dataSourceService } from "@/services/dataSourceService";
 import { useToastStore } from "@/hooks/useToastStore";
-import { DataSourceConnectionForm } from "@/components/management/DataSourceConnectionForm";
+import { DataSourceConnectionForm } from "@/components/management/data_sources/DataSourceConnectionForm";
 
 export default function DataSourceFormPage() {
   const { id } = useParams();
