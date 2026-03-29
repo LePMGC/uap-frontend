@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ArrowRight,
   Database,
@@ -8,78 +8,50 @@ import {
   RotateCcw,
   ChevronRight,
   ChevronDown as ChevronDownIcon,
+  HelpCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Step2Props {
   data: any;
   updateData: (newData: Partial<any>) => void;
+  commandParameters: any[];
 }
 
-export function Step2DataMapping({ data, updateData }: Step2Props) {
-  // State to track which parent nodes are collapsed
+export function Step2DataMapping({
+  data,
+  updateData,
+  commandParameters = [],
+}: Step2Props) {
   const [collapsedKeys, setCollapsedKeys] = useState<string[]>([]);
+  const sourceFields = data.preview?.headers || [];
 
-  const commandParameters = [
-    {
-      key: "subscriberNumber",
-      type: "String",
-      defaultValue: "1510101224",
-      level: 0,
-    },
-    { key: "originHostName", type: "String", defaultValue: "minsat", level: 0 },
-    {
-      key: "subDedicatedAccountUpdateInformation",
-      type: "Array",
-      level: 0,
-      isParent: true,
-    },
-    {
-      key: "subDedicatedAccountUpdateInformation.dedicatedAccountID",
-      type: "Int",
-      defaultValue: "2",
-      level: 1,
-    },
-    {
-      key: "subDedicatedAccountUpdateInformation.subDedicatedAccountIdentifier",
-      type: "Struct",
-      level: 1,
-      isParent: true,
-    },
-    {
-      key: "subDedicatedAccountUpdateInformation.subDedicatedAccountIdentifier.startDateCurrent",
-      type: "DateTime",
-      defaultValue: "99991231T12:00:00",
-      level: 2,
-    },
-    {
-      key: "subDedicatedAccountUpdateInformation.subDedicatedAccountIdentifier.expiryDateCurrent",
-      type: "DateTime",
-      defaultValue: "20111030T12:00:00",
-      level: 2,
-    },
-    {
-      key: "subDedicatedAccountUpdateInformation.adjustmentAmountRelative",
-      type: "String",
-      defaultValue: "300",
-      level: 1,
-    },
-    {
-      key: "transactionCurrency",
-      type: "String",
-      defaultValue: "EGP",
-      level: 0,
-    },
-  ];
+  // 🔵 INITIALIZATION LOGIC
+  // Automatically map parameters that have a 'value' from the BE as 'static' by default
+  useEffect(() => {
+    const initialMapping = { ...data.column_mapping };
+    let hasChanges = false;
 
-  const sourceFields = data.preview?.schema?.[0]
-    ? Object.keys(data.preview.schema[0]).map((field) => ({
-        label: field,
-        value: field,
-      }))
-    : [];
+    commandParameters.forEach((param) => {
+      // Only initialize if no mapping exists yet for this key AND a value is provided by BE
+      if (
+        !initialMapping[param.key] &&
+        param.value !== undefined &&
+        param.value !== null
+      ) {
+        initialMapping[param.key] = {
+          mode: "static",
+          value: String(param.value), // Ensure it's a string for the input field
+          excluded: false,
+        };
+        hasChanges = true;
+      }
+    });
 
-  /* --- HANDLERS --- */
+    if (hasChanges) {
+      updateData({ column_mapping: initialMapping });
+    }
+  }, [commandParameters]); // Runs when parameters are fetched from BE
 
   const toggleCollapse = (key: string) => {
     setCollapsedKeys((prev) =>
@@ -88,16 +60,15 @@ export function Step2DataMapping({ data, updateData }: Step2Props) {
   };
 
   const handleMappingUpdate = (targetKey: string, payload: any) => {
-    const currentMapping = data.mapping || {};
+    const currentMapping = data.column_mapping || {};
     updateData({
-      mapping: {
+      column_mapping: {
         ...currentMapping,
         [targetKey]: { ...currentMapping[targetKey], ...payload },
       },
     });
   };
 
-  // Logic to determine if a row should be hidden based on parent collapse state
   const isRowVisible = (paramKey: string) => {
     return !collapsedKeys.some((collapsedKey) =>
       paramKey.startsWith(collapsedKey + "."),
@@ -106,48 +77,66 @@ export function Step2DataMapping({ data, updateData }: Step2Props) {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center justify-between">
+      {/* HEADER ACTIONS */}
+      <div className="flex items-center justify-between bg-white p-4 rounded-[1.5rem] border border-slate-100 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-sm shadow-indigo-100">
+            <ArrowRight className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">
+              Field Mapping
+            </h3>
+            <p className="text-[10px] text-slate-400 font-medium">
+              Connect source columns to command parameters.
+            </p>
+          </div>
+        </div>
         <button
           onClick={() =>
             setCollapsedKeys((prev) =>
               prev.length
                 ? []
-                : commandParameters.filter((p) => p.isParent).map((p) => p.key),
+                : commandParameters
+                    .filter((p: any) => p.isParent)
+                    .map((p: any) => p.key),
             )
           }
-          className="text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-4 py-2 rounded-xl transition-all"
+          className="text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 px-4 py-2.5 rounded-xl transition-all border border-slate-100"
         >
-          {collapsedKeys.length ? "Expand All" : "Collapse All"}
+          {collapsedKeys.length ? "Expand All Groups" : "Collapse Groups"}
         </button>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-[2rem] overflow-hidden shadow-sm">
+      <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50/50 border-b border-slate-100">
               <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] w-[35%]">
-                Structure & Parameter
+                Command Parameter
               </th>
               <th className="px-4 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] text-center">
-                Connection
+                Mapping Mode
               </th>
               <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] w-[30%]">
-                Source / Value
+                Source / Static Value
               </th>
               <th className="px-4 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] text-center w-20">
-                Action
+                Skip
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {commandParameters.map((param) => {
+            {commandParameters.map((param: any) => {
               if (!isRowVisible(param.key)) return null;
 
-              const current = data.mapping?.[param.key] || {
+              // Use the state-stored mapping, or a local default if not yet initialized
+              const current = data.column_mapping?.[param.key] || {
                 mode: "static",
-                value: param.defaultValue,
+                value: param.value || "",
                 excluded: false,
               };
+
               const isExcluded = current.excluded;
               const isParent = param.isParent;
               const isCollapsed = collapsedKeys.includes(param.key);
@@ -161,10 +150,9 @@ export function Step2DataMapping({ data, updateData }: Step2Props) {
                     isExcluded
                       ? "bg-slate-50/50 opacity-40 grayscale"
                       : "hover:bg-slate-50/20",
-                    isParent && "bg-slate-50/30",
+                    isParent && "bg-slate-50/40",
                   )}
                 >
-                  {/* TARGET COLUMN */}
                   <td className="px-8 py-4">
                     <div
                       className="flex items-center"
@@ -179,25 +167,33 @@ export function Step2DataMapping({ data, updateData }: Step2Props) {
                           onClick={() => toggleCollapse(param.key)}
                           className="flex items-center gap-2 group/btn"
                         >
-                          <div className="w-5 h-5 rounded-md bg-white border border-slate-200 flex items-center justify-center group-hover/btn:border-indigo-300 transition-colors">
+                          <div className="w-5 h-5 rounded-md bg-white border border-slate-200 flex items-center justify-center group-hover/btn:border-indigo-300 transition-colors shadow-sm">
                             {isCollapsed ? (
                               <ChevronRight className="h-3 w-3 text-indigo-600" />
                             ) : (
                               <ChevronDownIcon className="h-3 w-3 text-indigo-600" />
                             )}
                           </div>
-                          <span className="text-[12px] font-black text-slate-700 uppercase tracking-wider">
+                          <span className="text-[11px] font-black text-slate-700 uppercase tracking-wider">
                             {displayName}
                           </span>
-                          <span className="text-[8px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded font-black uppercase">
+                          <span className="text-[8px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded font-black uppercase">
                             {param.type}
                           </span>
                         </button>
                       ) : (
                         <div className="flex flex-col">
-                          <span className="text-[13px] font-bold text-slate-800 font-mono">
-                            {displayName}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[13px] font-bold text-slate-800 font-mono">
+                              {displayName}
+                            </span>
+                            {param.is_required && (
+                              <span
+                                className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-sm shadow-red-200"
+                                title="Required Field"
+                              />
+                            )}
+                          </div>
                           <span className="text-[10px] text-slate-400 font-medium lowercase italic">
                             {param.type}
                           </span>
@@ -206,7 +202,6 @@ export function Step2DataMapping({ data, updateData }: Step2Props) {
                     </div>
                   </td>
 
-                  {/* CONNECTION COLUMN */}
                   <td className="px-4 py-4">
                     {!isParent && (
                       <div className="flex items-center justify-center gap-6">
@@ -233,7 +228,7 @@ export function Step2DataMapping({ data, updateData }: Step2Props) {
                             onClick={() =>
                               handleMappingUpdate(param.key, {
                                 mode: "static",
-                                value: param.defaultValue,
+                                value: param.value || "",
                               })
                             }
                             className={cn(
@@ -246,10 +241,11 @@ export function Step2DataMapping({ data, updateData }: Step2Props) {
                             <Type className="h-4 w-4" />
                           </button>
                         </div>
+
                         <div className="flex items-center w-24">
                           <div
                             className={cn(
-                              "h-[1.5px] flex-1",
+                              "h-[1.5px] flex-1 transition-all",
                               current.value && !isExcluded
                                 ? "bg-emerald-400"
                                 : "bg-slate-200",
@@ -257,9 +253,9 @@ export function Step2DataMapping({ data, updateData }: Step2Props) {
                           />
                           <div
                             className={cn(
-                              "w-8 h-8 rounded-full border flex items-center justify-center shrink-0 -mx-1",
+                              "w-8 h-8 rounded-full border flex items-center justify-center shrink-0 -mx-1 transition-all",
                               current.value && !isExcluded
-                                ? "bg-emerald-50 border-emerald-200 text-emerald-500"
+                                ? "bg-emerald-50 border-emerald-200 text-emerald-500 shadow-sm"
                                 : "bg-white border-slate-200 text-slate-300",
                             )}
                           >
@@ -267,7 +263,7 @@ export function Step2DataMapping({ data, updateData }: Step2Props) {
                           </div>
                           <div
                             className={cn(
-                              "h-[1.5px] flex-1",
+                              "h-[1.5px] flex-1 transition-all",
                               current.value && !isExcluded
                                 ? "bg-emerald-400"
                                 : "bg-slate-200",
@@ -278,7 +274,6 @@ export function Step2DataMapping({ data, updateData }: Step2Props) {
                     )}
                   </td>
 
-                  {/* VALUE INPUT */}
                   <td className="px-8 py-4">
                     {!isParent &&
                       (current.mode === "dynamic" ? (
@@ -291,12 +286,12 @@ export function Step2DataMapping({ data, updateData }: Step2Props) {
                                 value: e.target.value,
                               })
                             }
-                            className="w-full h-11 px-4 pr-10 rounded-2xl border appearance-none bg-white text-[12px] font-medium outline-none border-slate-200 text-slate-900"
+                            className="w-full h-11 px-4 pr-10 rounded-2xl border appearance-none bg-white text-[12px] font-bold outline-none border-slate-200 text-slate-700 focus:border-indigo-500 transition-all shadow-sm"
                           >
-                            <option value="">-- Source Field --</option>
-                            {sourceFields.map((f) => (
-                              <option key={f.value} value={f.value}>
-                                {f.label}
+                            <option value="">-- Choose Column --</option>
+                            {sourceFields.map((header: string) => (
+                              <option key={header} value={header}>
+                                {header}
                               </option>
                             ))}
                           </select>
@@ -306,18 +301,18 @@ export function Step2DataMapping({ data, updateData }: Step2Props) {
                         <input
                           disabled={isExcluded}
                           type="text"
+                          placeholder="Enter static value..."
                           value={current.value}
                           onChange={(e) =>
                             handleMappingUpdate(param.key, {
                               value: e.target.value,
                             })
                           }
-                          className="w-full h-11 px-4 rounded-2xl border bg-white text-[12px] font-medium outline-none border-slate-200 focus:border-indigo-500 text-slate-900"
+                          className="w-full h-11 px-4 rounded-2xl border bg-white text-[12px] font-bold outline-none border-slate-200 focus:border-indigo-500 text-slate-700 placeholder:text-slate-300 transition-all shadow-sm"
                         />
                       ))}
                   </td>
 
-                  {/* ACTION */}
                   <td className="px-4 py-4 text-center">
                     <button
                       onClick={() =>
@@ -344,6 +339,17 @@ export function Step2DataMapping({ data, updateData }: Step2Props) {
             })}
           </tbody>
         </table>
+      </div>
+
+      <div className="flex items-center gap-3 px-6 py-4 bg-amber-50/50 border border-amber-100 rounded-2xl">
+        <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+          <HelpCircle className="h-4 w-4 text-amber-600" />
+        </div>
+        <p className="text-[11px] text-amber-800 font-medium leading-relaxed">
+          The fields have been pre-filled with default values where available.
+          You can change the mapping to a source column using the{" "}
+          <Database className="h-3 w-3 inline mb-0.5" /> icon.
+        </p>
       </div>
     </div>
   );

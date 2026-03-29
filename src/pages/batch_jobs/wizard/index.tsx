@@ -8,17 +8,23 @@ import { Step2DataMapping } from "./Step2DataMapping";
 import { Step3Scheduling } from "./Step3Scheduling";
 import { Step4Review } from "./Step4Review";
 import { SuccessModal } from "@/components/batch-jobs/SuccessModal";
+import { useToastStore } from "@/hooks/useToastStore";
+import { commandService } from "@/services/commandService";
 
 export default function CreateBatchJobPage() {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [createdJobId, setCreatedJobId] = useState("");
+  const [commandParams, setCommandParams] = useState([]);
+  const { showToast } = useToastStore();
 
   const [formData, setFormData] = useState({
     name: "",
     provider_instance_id: "",
+    provider_name: "",
     command_id: "",
+    command_name: "",
     source_type: "upload",
     source_config: {},
     column_mapping: {},
@@ -33,12 +39,21 @@ export default function CreateBatchJobPage() {
     { id: 4, title: "Review" },
   ];
 
-  const handleNext = () => {
-    if (currentStep < 4) {
-      setCurrentStep((prev) => prev + 1);
+  const handleNext = async () => {
+    if (currentStep === 1) {
+      // Before moving to Step 2, fetch the definition of the command
+      try {
+        const response = await commandService.getOneCommand(
+          formData.command_id,
+        );
+        // Assuming response contains a 'parameters' array
+        setCommandParams(response.mapping_blueprint);
+        setCurrentStep(2);
+      } catch (error) {
+        showToast("Failed to load command parameters", "error");
+      }
     } else {
-      // 🟢 HANDLE FINALIZATION
-      handleFinalize();
+      setCurrentStep((prev) => prev + 1);
     }
   };
 
@@ -78,20 +93,23 @@ export default function CreateBatchJobPage() {
             {currentStep === 1 && (
               <Step1BasicInfo
                 data={formData}
-                updateData={(newData) =>
-                  setFormData({ ...formData, ...newData })
-                }
+                updateData={updateFormData} // Standardized
                 onConfirm={handleNext}
               />
             )}
+
             {currentStep === 2 && (
-              <Step2DataMapping data={formData} updateData={updateFormData} />
+              <Step2DataMapping
+                data={formData}
+                commandParameters={commandParams}
+                updateData={updateFormData} // FIXED: was updateData
+              />
             )}
+
             {currentStep === 3 && (
               <Step3Scheduling data={formData} updateData={updateFormData} />
             )}
 
-            {/* FIX: Explicitly pass the goToStep function */}
             {currentStep === 4 && (
               <Step4Review
                 data={formData}
@@ -124,8 +142,8 @@ export default function CreateBatchJobPage() {
               </button>
 
               <button
-                onClick={handleNext}
-                className="px-5 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium flex items-center gap-2 hover:bg-indigo-700"
+                onClick={currentStep === 4 ? handleFinalize : handleNext} // UPDATED LOGIC
+                className="px-5 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium flex items-center gap-2 hover:bg-indigo-700 transition-colors"
               >
                 {currentStep === 4 ? "Finalize & Launch" : "Next Step"}
                 {currentStep === 4 ? (
@@ -138,7 +156,6 @@ export default function CreateBatchJobPage() {
           </div>
         </div>
       </div>
-
       {/* 4. Add the Modal Component */}
       <SuccessModal
         isOpen={isSuccessModalOpen}

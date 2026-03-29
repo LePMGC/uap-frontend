@@ -21,9 +21,9 @@ export const commandService = {
     return response.data;
   },
 
-  getCommandsByCategory: async (category_slug: string) => {
+  getCommandsByCategory: async (category_slug: string, minimal: boolean) => {
     const response = await api.get("/management/commands", {
-      params: { category: category_slug, per_page: 1000 },
+      params: { category: category_slug, per_page: 1000, minimal },
     });
     return response.data.data; // ✅
   },

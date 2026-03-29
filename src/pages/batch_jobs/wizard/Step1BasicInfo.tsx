@@ -70,6 +70,7 @@ export function Step1BasicInfo({ data, updateData, onConfirm }: Step1Props) {
         if (instance?.category_slug) {
           const res = await commandService.getCommandsByCategory(
             instance.category_slug,
+            true,
           );
           setCommands(res || []);
         }
@@ -163,12 +164,18 @@ export function Step1BasicInfo({ data, updateData, onConfirm }: Step1Props) {
             <div className="relative">
               <select
                 value={data.provider_instance_id}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const selectedId = e.target.value;
+                  const selectedInst = instances.find(
+                    (i) => i.id.toString() === selectedId,
+                  );
                   updateData({
-                    provider_instance_id: e.target.value,
+                    provider_instance_id: selectedId,
+                    provider_name: selectedInst?.name || "",
                     command_id: "",
-                  })
-                }
+                    command_name: "",
+                  });
+                }}
                 className="w-full h-12 px-10 rounded-2xl border border-slate-200 appearance-none bg-white font-medium outline-none"
               >
                 <option value="">Select an instance...</option>
@@ -191,7 +198,15 @@ export function Step1BasicInfo({ data, updateData, onConfirm }: Step1Props) {
               <CommandSelect
                 commands={commands}
                 value={data.command_id}
-                onChange={(val: any) => updateData({ command_id: val })}
+                onChange={(val: any) => {
+                  const selectedCmd = commands.find(
+                    (c) => c.id.toString() === val.toString(),
+                  );
+                  updateData({
+                    command_id: val,
+                    command_name: selectedCmd?.name || "",
+                  });
+                }}
                 disabled={!data.provider_instance_id || loading.commands}
               />
               <Terminal className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
