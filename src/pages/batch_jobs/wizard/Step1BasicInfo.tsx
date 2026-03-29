@@ -10,22 +10,20 @@ import {
 import { providerInstanceService } from "@/services/providerInstanceService";
 import { commandService } from "@/services/commandService";
 import { cn } from "@/lib/utils";
-
-// UI Components
 import { CommandSelect } from "@/components/batch-jobs/CommandSelect";
 import { DataPreviewPanel } from "@/components/batch-jobs/DataPreviewPanel";
-import { FileUploadSource } from "@/components/batch-jobs/sources/FileUploadSource";
-import { DatabaseSource } from "@/components/batch-jobs/sources/DatabaseSource";
-
 import { APISource } from "@/components/batch-jobs/sources/APISource";
+import { DatabaseSource } from "@/components/batch-jobs/sources/DatabaseSource";
+import { FileUploadSource } from "@/components/batch-jobs/sources/FileUploadSource";
 import { SFTPSource } from "@/components/batch-jobs/sources/SFTPSource";
 
 interface Step1Props {
   data: any;
   updateData: (newData: Partial<any>) => void;
+  onConfirm: () => void;
 }
 
-export function Step1BasicInfo({ data, updateData }: Step1Props) {
+export function Step1BasicInfo({ data, updateData, onConfirm }: Step1Props) {
   const [instances, setInstances] = useState<any[]>([]);
   const [commands, setCommands] = useState<any[]>([]);
   const [loading, setLoading] = useState({
@@ -99,7 +97,7 @@ export function Step1BasicInfo({ data, updateData }: Step1Props) {
     updateData({ preview: mockPreviewData });
   };
 
-  const handleClearPreview = () => {
+  const handleClosePreview = () => {
     updateData({ preview: null });
   };
 
@@ -218,7 +216,7 @@ export function Step1BasicInfo({ data, updateData }: Step1Props) {
               <button
                 key={type.id}
                 onClick={() => {
-                  handleClearPreview(); // Reset preview when switching types
+                  handleClosePreview(); // Reset preview when switching types
                   updateData({ source_type: type.id, source_config: {} });
                 }}
                 className={cn(
@@ -275,12 +273,13 @@ export function Step1BasicInfo({ data, updateData }: Step1Props) {
       </div>
 
       {/* RIGHT SIDE: PREVIEW PANEL */}
-      {showPreview && (
+      {data.preview && (
         <aside className="sticky top-0 animate-in fade-in slide-in-from-right-10 duration-500 h-fit">
           <DataPreviewPanel
-            visible={showPreview}
+            visible={!!data.preview}
             data={data.preview}
-            onClose={handleClearPreview}
+            onClose={() => updateData({ preview: null })}
+            onConfirm={onConfirm}
           />
         </aside>
       )}

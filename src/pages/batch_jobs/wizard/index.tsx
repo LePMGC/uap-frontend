@@ -57,22 +57,6 @@ export default function CreateBatchJobPage() {
     <div className="min-h-screen bg-slate-50">
       {/* 🔵 HEADER */}
       <div className="bg-white border-b border-slate-200 px-8 py-4">
-        <div className="flex items-center gap-3 text-sm text-slate-500 mb-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-1 hover:text-slate-800"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Back
-          </button>
-          <span>/</span>
-          <span>Operations</span>
-          <span>/</span>
-          <span>Batch Jobs</span>
-          <span>/</span>
-          <span className="text-slate-900 font-medium">Create Batch Job</span>
-        </div>
-
         <h1 className="text-2xl font-semibold text-slate-900">
           Create Batch Job
         </h1>
@@ -92,7 +76,13 @@ export default function CreateBatchJobPage() {
           {/* CONTENT */}
           <div className="p-8 w-full">
             {currentStep === 1 && (
-              <Step1BasicInfo data={formData} updateData={updateFormData} />
+              <Step1BasicInfo
+                data={formData}
+                updateData={(newData) =>
+                  setFormData({ ...formData, ...newData })
+                }
+                onConfirm={handleNext}
+              />
             )}
             {currentStep === 2 && (
               <Step2DataMapping data={formData} updateData={updateFormData} />

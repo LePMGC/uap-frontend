@@ -1,13 +1,13 @@
 import { X, CheckCircle2 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface Props {
   visible: boolean;
-  data?: any; // Expecting { fileName: string, schema: any[] }
+  data?: any;
   onClose: () => void;
+  onConfirm: () => void;
 }
 
-export function DataPreviewPanel({ visible, data, onClose }: Props) {
+export function DataPreviewPanel({ visible, data, onClose, onConfirm }: Props) {
   if (!visible || !data) return null;
 
   // Use the schema array from our data object for the preview rows
@@ -68,7 +68,7 @@ export function DataPreviewPanel({ visible, data, onClose }: Props) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {rows.slice(0, 5).map((row: any, i: number) => (
+                  {rows.slice(0, 10).map((row: any, i: number) => (
                     <tr
                       key={i}
                       className="hover:bg-slate-50/50 transition-colors"
@@ -89,15 +89,24 @@ export function DataPreviewPanel({ visible, data, onClose }: Props) {
           </div>
         </div>
 
-        {/* 🟢 PANEL FOOTER ACTION */}
-        <div className="p-5 mt-auto">
+        {/* 🟢 FIXED FOOTER ACTION */}
+        <div className="p-5 border-t border-slate-100 bg-white shrink-0">
           <button
-            onClick={onClose} // Triggers the same close action as the X button for now
-            className="w-full py-3 rounded-xl bg-indigo-600 text-white text-[11px] font-black uppercase tracking-widest hover:bg-indigo-700 shadow-lg shadow-indigo-100 flex items-center justify-center gap-2 transition-all active:scale-95"
+            onClick={onConfirm}
+            className="w-full py-2.5 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 shadow-lg shadow-slate-200 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
           >
-            <CheckCircle2 className="h-4 w-4" />
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
             Confirm Definition
           </button>
+
+          {/* Subtle helper text to fill the space visually without adding bulk */}
+          <div className="flex items-center justify-center gap-1.5 mt-3 opacity-40">
+            <span className="h-px w-4 bg-slate-300"></span>
+            <p className="text-[8px] text-slate-500 font-bold uppercase tracking-tighter">
+              Ready for mapping
+            </p>
+            <span className="h-px w-4 bg-slate-300"></span>
+          </div>
         </div>
       </div>
     </div>

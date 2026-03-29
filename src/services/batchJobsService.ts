@@ -31,4 +31,21 @@ export const batchJobsService = {
     const response = await api.get("/batch/templates/stats");
     return response.data;
   },
+
+  discoverSchema: async (payload: FormData | object) => {
+    const isFormData = payload instanceof FormData;
+
+    const response = await api.post(
+      "/batch/discover-headers-and-first-rows",
+      payload,
+      {
+        headers: {
+          "Content-Type": isFormData
+            ? "multipart/form-data"
+            : "application/json",
+        },
+      },
+    );
+    return response.data;
+  },
 };
