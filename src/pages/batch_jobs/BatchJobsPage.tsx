@@ -265,11 +265,11 @@ export default function BatchJobsPage() {
       icon: <Copy className="h-3.5 w-3.5" />,
       onClick: () => showToast("Job cloned to templates", "success"),
     },
-    {
+    /*{
       label: "Edit Details",
       icon: <FileText className="h-3.5 w-3.5" />,
       onClick: (item: any) => navigate(`/batches/edit/${item.id}`),
-    },
+    },*/
     {
       label: "Delete",
       variant: "danger" as const,

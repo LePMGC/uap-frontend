@@ -96,11 +96,18 @@ export default function CreateBatchJobPage() {
       // 2. Call the backend service
       const response = await batchJobsService.create(payload);
 
-      // 3. Handle success
-      if (response.success || response.id) {
+      // 3. Handle success - Match the "template" and "instance_id" keys from your BE
+      if (response.template || response.id) {
+        // Use template.id from your new BE response
+        const newId = response.template?.id || response.id;
+
+        setCreatedJobId(newId);
+        setIsSuccessModalOpen(true);
+        //showToast("Batch job created successfully", "success");
+      } else if (response.id || response.uuid) {
+        // Fallback if your service already returns the inner data
         setCreatedJobId(response.id || response.uuid);
         setIsSuccessModalOpen(true);
-        showToast("Batch job created successfully", "success");
       }
     } catch (error: any) {
       console.error("Creation failed:", error);

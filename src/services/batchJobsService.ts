@@ -49,4 +49,66 @@ export const batchJobsService = {
     const response = await api.post("/batch/templates", data);
     return response.data;
   },
+
+  /**
+   * Fetch all execution instances for a specific job template.
+   * Powers the "Select Instance" dropdown.
+   */
+  getInstances: async (templateId: string | number) => {
+    const response = await api.get(`/batch/templates/${templateId}/instances`);
+    return response.data; // Expected: Array of { id, name, executed_at, status }
+  },
+
+  /**
+   * Fetch summary statistics and error analysis for a specific instance.
+   * Powers the Metric Cards and Error Analysis sidebar.
+   */
+  getInstanceDetails: async (instanceId: string | number) => {
+    const response = await api.get(`/batch/instances/${instanceId}/summary`);
+    return response.data;
+  },
+
+  /**
+   * Fetch paginated logs for a specific execution instance.
+   * Powers the Command Logs table and status filters.
+   */
+  getInstanceLogs: async (
+    instanceId: string | number,
+    page = 1,
+    limit = 10,
+    status?: string,
+  ) => {
+    const params = {
+      page,
+      per_page: limit,
+      ...(status && status !== "All" && { status: status.toLowerCase() }),
+    };
+
+    const response = await api.get(`/batch/instances/${instanceId}/logs`, {
+      params,
+    });
+    return response.data;
+  },
+
+  /**
+   * Action to retry all failed records for a specific instance.
+   * Powers the "Retry Failed" button.
+   */
+  retryFailedRecords: async (instanceId: string | number) => {
+    const response = await api.post(
+      `/batch/instances/${instanceId}/retry-failed`,
+    );
+    return response.data;
+  },
+
+  /**
+   * Action to retry a single specific record.
+   * Powers the individual row-level retry icon.
+   */
+  retrySingleRecord: async (instanceId: string | number, recordId: string) => {
+    const response = await api.post(
+      `/batch/instances/${instanceId}/records/${recordId}/retry`,
+    );
+    return response.data;
+  },
 };
