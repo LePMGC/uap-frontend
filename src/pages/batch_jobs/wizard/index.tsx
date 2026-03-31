@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, ChevronLeft, ChevronRight, Play } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { StepperHeader } from "./StepperHeader";
 import { cn } from "@/lib/utils";
 import { Step1BasicInfo } from "./Step1BasicInfo";
@@ -10,6 +10,7 @@ import { Step4Review } from "./Step4Review";
 import { SuccessModal } from "@/components/batch-jobs/SuccessModal";
 import { useToastStore } from "@/hooks/useToastStore";
 import { commandService } from "@/services/commandService";
+import { batchJobsService } from "@/services/batchJobsService";
 
 export default function CreateBatchJobPage() {
   const navigate = useNavigate();
@@ -26,10 +27,14 @@ export default function CreateBatchJobPage() {
     command_id: "",
     command_name: "",
     source_type: "upload",
-    source_config: {},
-    column_mapping: {},
+    source_config: {} as any,
+    column_mapping: {} as Record<string, string>,
     is_scheduled: false,
     cron_expression: "",
+    starts_at: "", // Added to resolve TS2339
+    ends_at: "", // Added to resolve TS2339
+    step2Valid: false,
+    step3Valid: false,
   });
 
   const steps = [
@@ -41,12 +46,10 @@ export default function CreateBatchJobPage() {
 
   const handleNext = async () => {
     if (currentStep === 1) {
-      // Before moving to Step 2, fetch the definition of the command
       try {
         const response = await commandService.getOneCommand(
           formData.command_id,
         );
-        // Assuming response contains a 'parameters' array
         setCommandParams(response.mapping_blueprint);
         setCurrentStep(2);
       } catch (error) {
@@ -58,10 +61,56 @@ export default function CreateBatchJobPage() {
   };
 
   const handleFinalize = async () => {
-    const mockUuid = crypto.randomUUID();
-    setCreatedJobId(mockUuid);
-    setIsSuccessModalOpen(true);
+    try {
+      // 1. Correctly extract dynamic column names from the new mapping structure
+      const dynamicColumns = Object.values(
+        formData.column_mapping as Record<string, any>,
+      )
+        .filter((mapping) => mapping.mode === "dynamic" && mapping.value)
+        .map((mapping) => mapping.value);
+
+      const payload = {
+        name: formData.name,
+        provider_instance_id: formData.provider_instance_id,
+        data_source_id: 1,
+        command_id: formData.command_id,
+        job_specific_config: {
+          command: formData.command_name,
+        },
+
+        // Use the extracted dynamic columns here
+        expected_columns: dynamicColumns,
+
+        column_mapping: formData.column_mapping,
+        source_config: formData.source_config,
+        is_scheduled: formData.is_scheduled,
+
+        ...(formData.is_scheduled && {
+          cron_expression: formData.cron_expression,
+          starts_at: formData.starts_at,
+          ends_at: formData.ends_at,
+          timezone: "UTC",
+        }),
+      };
+
+      // 2. Call the backend service
+      const response = await batchJobsService.create(payload);
+
+      // 3. Handle success
+      if (response.success || response.id) {
+        setCreatedJobId(response.id || response.uuid);
+        setIsSuccessModalOpen(true);
+        showToast("Batch job created successfully", "success");
+      }
+    } catch (error: any) {
+      console.error("Creation failed:", error);
+      showToast(
+        error.response?.data?.message || "Failed to create batch job",
+        "error",
+      );
+    }
   };
+
   const handleBack = () => setCurrentStep((prev) => Math.max(prev - 1, 1));
 
   const updateFormData = (newData: Partial<typeof formData>) => {
@@ -70,7 +119,6 @@ export default function CreateBatchJobPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* 🔵 HEADER */}
       <div className="bg-white border-b border-slate-200 px-8 py-4">
         <h1 className="text-2xl font-semibold text-slate-900">
           Create Batch Job
@@ -80,36 +128,30 @@ export default function CreateBatchJobPage() {
         </p>
       </div>
 
-      {/* 🔵 STEPPER (FULL WIDTH) */}
       <div className="bg-white border-b border-slate-200 px-8 py-6">
         <StepperHeader currentStep={currentStep} steps={steps} />
       </div>
 
-      {/* 🔵 MAIN CONTENT */}
       <div className="p-8">
         <div className="w-full bg-white border border-slate-200 rounded-2xl shadow-sm">
-          {/* CONTENT */}
           <div className="p-8 w-full">
             {currentStep === 1 && (
               <Step1BasicInfo
                 data={formData}
-                updateData={updateFormData} // Standardized
+                updateData={updateFormData}
                 onConfirm={handleNext}
               />
             )}
-
             {currentStep === 2 && (
               <Step2DataMapping
                 data={formData}
                 commandParameters={commandParams}
-                updateData={updateFormData} // FIXED: was updateData
+                updateData={updateFormData}
               />
             )}
-
             {currentStep === 3 && (
               <Step3Scheduling data={formData} updateData={updateFormData} />
             )}
-
             {currentStep === 4 && (
               <Step4Review
                 data={formData}
@@ -118,7 +160,6 @@ export default function CreateBatchJobPage() {
             )}
           </div>
 
-          {/* FOOTER */}
           <div className="px-8 py-5 border-t border-slate-200 flex justify-between items-center">
             <button
               onClick={handleBack}
@@ -140,23 +181,28 @@ export default function CreateBatchJobPage() {
               >
                 Cancel
               </button>
-
               <button
-                onClick={currentStep === 4 ? handleFinalize : handleNext} // UPDATED LOGIC
-                className="px-5 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium flex items-center gap-2 hover:bg-indigo-700 transition-colors"
+                onClick={currentStep === 4 ? handleFinalize : handleNext}
+                disabled={
+                  (currentStep === 1 && !formData.command_id) ||
+                  (currentStep === 2 && !formData.step2Valid) ||
+                  (currentStep === 3 && !formData.step3Valid)
+                }
+                className={cn(
+                  "px-5 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all",
+                  (currentStep === 2 && !formData.step2Valid) ||
+                    (currentStep === 3 && !formData.step3Valid)
+                    ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                    : "bg-indigo-600 text-white hover:bg-indigo-700",
+                )}
               >
                 {currentStep === 4 ? "Finalize & Launch" : "Next Step"}
-                {currentStep === 4 ? (
-                  <Play className="h-4 w-4" />
-                ) : (
-                  <ChevronRight className="h-4 w-4" />
-                )}
+                <ChevronRight className="h-4 w-4" />
               </button>
             </div>
           </div>
         </div>
       </div>
-      {/* 4. Add the Modal Component */}
       <SuccessModal
         isOpen={isSuccessModalOpen}
         jobId={createdJobId}

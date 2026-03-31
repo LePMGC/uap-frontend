@@ -83,4 +83,19 @@ export const commandService = {
     // Unwrap the nested 'data' property from the BE response
     return response.data.data;
   },
+
+  getProjectedPayload: async (
+    commandId: string,
+    mapping: any,
+    sampleRow: any,
+  ) => {
+    const response = await api.post(
+      `/management/commands/${commandId}/project-payload`,
+      {
+        mapping,
+        sample_data: sampleRow,
+      },
+    );
+    return response.data;
+  },
 };

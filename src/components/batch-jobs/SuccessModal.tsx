@@ -37,7 +37,7 @@ export function SuccessModal({ isOpen, jobId, jobName }: SuccessModalProps) {
         {/* Action Buttons */}
         <div className="grid grid-cols-1 gap-3 pt-4">
           <button
-            onClick={() => navigate(`/operations/batch-jobs/${jobId}`)}
+            onClick={() => navigate(`/batch-jobs/${jobId}`)}
             className="flex items-center justify-center gap-3 w-full py-4 bg-indigo-600 text-white rounded-[1.5rem] font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 group"
           >
             Go to Job Details
@@ -45,7 +45,7 @@ export function SuccessModal({ isOpen, jobId, jobName }: SuccessModalProps) {
           </button>
 
           <button
-            onClick={() => navigate("/operations/batch-jobs")}
+            onClick={() => navigate("/batch-jobs")}
             className="flex items-center justify-center gap-3 w-full py-4 bg-slate-100 text-slate-700 rounded-[1.5rem] font-bold text-sm hover:bg-slate-200 transition-all"
           >
             <List className="h-4 w-4" />

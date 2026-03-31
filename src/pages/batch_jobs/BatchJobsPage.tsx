@@ -233,7 +233,7 @@ export default function BatchJobsPage() {
     {
       label: "View Details",
       icon: <Eye className="h-3.5 w-3.5" />,
-      onClick: (item: any) => navigate(`/batches/jobs/${item.id}`),
+      onClick: (item: any) => navigate(`/batch-jobs/${item.id}`),
     },
     {
       label: "Pause Batch Job",

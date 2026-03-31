@@ -17,11 +17,6 @@ export const batchJobsService = {
     return response.data;
   },
 
-  create: async (data: any) => {
-    const response = await api.post("/batch/templates", data);
-    return response.data;
-  },
-
   update: async (id: number | string, data: any) => {
     const response = await api.put(`/batch/templates${id}`, data);
     return response.data;
@@ -46,6 +41,12 @@ export const batchJobsService = {
         },
       },
     );
+    return response.data;
+  },
+
+  create: async (data: any) => {
+    // This calls POST /batch/templates as per your requirement
+    const response = await api.post("/batch/templates", data);
     return response.data;
   },
 };

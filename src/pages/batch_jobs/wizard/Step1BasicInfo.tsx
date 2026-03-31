@@ -6,6 +6,7 @@ import {
   Database,
   Globe,
   ChevronDown,
+  AlertCircle,
 } from "lucide-react";
 import { providerInstanceService } from "@/services/providerInstanceService";
 import { commandService } from "@/services/commandService";
@@ -30,6 +31,17 @@ export function Step1BasicInfo({ data, updateData, onConfirm }: Step1Props) {
     instances: false,
     commands: false,
   });
+
+  /* ---------------- VALIDATION LOGIC ---------------- */
+
+  // Basic info must be present before allowing source configuration/preview
+  const isBasicInfoValid =
+    !!data.name?.trim() && !!data.provider_instance_id && !!data.command_id;
+
+  // Source-specific validation (can be expanded based on specific source requirements)
+  const isSourceConfigured = !!data.source_type;
+
+  const canTriggerPreview = isBasicInfoValid && isSourceConfigured;
 
   /* ---------------- MAPPING STRATEGIES ---------------- */
   const SourceComponents: Record<string, any> = {
@@ -84,6 +96,8 @@ export function Step1BasicInfo({ data, updateData, onConfirm }: Step1Props) {
   /* ---------------- HANDLERS ---------------- */
 
   const handleTriggerPreview = () => {
+    if (!canTriggerPreview) return;
+
     // Mocking the detection process
     const mockPreviewData = {
       fileName:
@@ -102,7 +116,6 @@ export function Step1BasicInfo({ data, updateData, onConfirm }: Step1Props) {
     updateData({ preview: null });
   };
 
-  // Define visibility for the grid and the panel
   const showPreview = !!data.preview;
 
   const sourceTypes = [
@@ -146,14 +159,16 @@ export function Step1BasicInfo({ data, updateData, onConfirm }: Step1Props) {
         {/* SECTION 1: CORE DETAILS */}
         <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="space-y-2">
-            <label className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">
-              Batch Job Name
+            <label className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
+              Batch Job Name{" "}
+              {!data.name && <AlertCircle className="h-3 w-3 text-amber-500" />}
             </label>
             <input
               type="text"
-              value={data.name}
+              placeholder="e.g. Monthly Subscription Sync"
+              value={data.name || ""}
               onChange={(e) => updateData({ name: e.target.value })}
-              className="w-full h-12 px-4 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/5 outline-none font-medium"
+              className="w-full h-12 px-4 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/5 outline-none font-medium transition-all"
             />
           </div>
 
@@ -163,7 +178,7 @@ export function Step1BasicInfo({ data, updateData, onConfirm }: Step1Props) {
             </label>
             <div className="relative">
               <select
-                value={data.provider_instance_id}
+                value={data.provider_instance_id || ""}
                 onChange={(e) => {
                   const selectedId = e.target.value;
                   const selectedInst = instances.find(
@@ -176,7 +191,7 @@ export function Step1BasicInfo({ data, updateData, onConfirm }: Step1Props) {
                     command_name: "",
                   });
                 }}
-                className="w-full h-12 px-10 rounded-2xl border border-slate-200 appearance-none bg-white font-medium outline-none"
+                className="w-full h-12 px-10 rounded-2xl border border-slate-200 appearance-none bg-white font-medium outline-none transition-all"
               >
                 <option value="">Select an instance...</option>
                 {instances.map((inst) => (
@@ -215,13 +230,22 @@ export function Step1BasicInfo({ data, updateData, onConfirm }: Step1Props) {
         </section>
 
         {/* SECTION 2: DATA SOURCE STRATEGY */}
-        <section className="space-y-6">
+        <section
+          className={cn(
+            "space-y-6 transition-opacity duration-300",
+            !isBasicInfoValid
+              ? "opacity-50 pointer-events-none"
+              : "opacity-100",
+          )}
+        >
           <div className="flex flex-col">
             <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">
               Data Source Configuration
             </h3>
             <p className="text-[11px] text-slate-500 mt-1">
-              Select the ingestion method and configure connection details.
+              {!isBasicInfoValid
+                ? "Complete basic info above to configure data source."
+                : "Select the ingestion method and configure connection details."}
             </p>
           </div>
 
@@ -230,8 +254,9 @@ export function Step1BasicInfo({ data, updateData, onConfirm }: Step1Props) {
             {sourceTypes.map((type) => (
               <button
                 key={type.id}
+                disabled={!isBasicInfoValid}
                 onClick={() => {
-                  handleClosePreview(); // Reset preview when switching types
+                  handleClosePreview();
                   updateData({ source_type: type.id, source_config: {} });
                 }}
                 className={cn(
@@ -276,6 +301,7 @@ export function Step1BasicInfo({ data, updateData, onConfirm }: Step1Props) {
               <SelectedSourceUI
                 data={data}
                 updateData={updateData}
+                // Only allow preview if basic info is solid
                 onPreview={handleTriggerPreview}
               />
             ) : (
@@ -294,6 +320,7 @@ export function Step1BasicInfo({ data, updateData, onConfirm }: Step1Props) {
             visible={!!data.preview}
             data={data.preview}
             onClose={() => updateData({ preview: null })}
+            // Final Step 1 validation: onConfirm only works if preview was successful
             onConfirm={onConfirm}
           />
         </aside>

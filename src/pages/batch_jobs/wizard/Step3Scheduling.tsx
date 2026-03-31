@@ -4,7 +4,6 @@ import {
   Clock,
   RefreshCw,
   Info,
-  Globe,
   Play,
   CalendarRange,
 } from "lucide-react";
@@ -18,15 +17,48 @@ interface Step3Props {
 type Frequency = "minute" | "hourly" | "daily" | "weekly" | "monthly";
 
 export function Step3Scheduling({ data, updateData }: Step3Props) {
+  // Initialize state from existing data to persist values when navigating back
   const [scheduleType, setScheduleType] = useState<"once" | "recurring">(
     data.is_scheduled ? "recurring" : "once",
   );
 
-  const [freq, setFreq] = useState<Frequency>("daily");
-  const [time, setTime] = useState("00:00");
-  const [dayOfWeek, setDayOfWeek] = useState("1");
-  const [dayOfMonth, setDayOfMonth] = useState("1");
+  const [freq, setFreq] = useState<Frequency>(data.frequency || "daily");
+  const [time, setTime] = useState(data.execution_time || "");
+  const [dayOfWeek, setDayOfWeek] = useState(data.day_of_week || "1");
+  const [dayOfMonth, setDayOfMonth] = useState(data.day_of_month || "1");
   const [humanReadable, setHumanReadable] = useState("");
+
+  // 1. VALIDATION LOGIC
+  useEffect(() => {
+    let isValid = true;
+
+    if (scheduleType === "recurring") {
+      // Rule: Execution Time is mandatory for Daily/Weekly/Monthly
+      const needsTime = ["daily", "weekly", "monthly"].includes(freq);
+      if (needsTime && !time) {
+        isValid = false;
+      }
+
+      // Rule: Start Date is required for recurring
+      if (!data.starts_at) {
+        isValid = false;
+      }
+
+      // Rule: End Date must be after Start Date
+      if (data.starts_at && data.ends_at) {
+        const start = new Date(data.starts_at).getTime();
+        const end = new Date(data.ends_at).getTime();
+        if (end <= start) {
+          isValid = false;
+        }
+      }
+    }
+
+    // Update parent validity state
+    if (data.step3Valid !== isValid) {
+      updateData({ step3Valid: isValid });
+    }
+  }, [data.starts_at, data.ends_at, scheduleType, freq, time, data.step3Valid]);
 
   // Helper to format the human-readable string
   const generateDescription = (
@@ -35,7 +67,10 @@ export function Step3Scheduling({ data, updateData }: Step3Props) {
     dow: string,
     dom: string,
   ) => {
-    const [hh, mm] = t.split(":");
+    if (!t && ["daily", "weekly", "monthly"].includes(f))
+      return "Waiting for time selection...";
+
+    const [hh, mm] = t ? t.split(":") : ["00", "00"];
     const timeStr = `${hh}:${mm}`;
     const days = [
       "Sunday",
@@ -71,15 +106,21 @@ export function Step3Scheduling({ data, updateData }: Step3Props) {
     return s[(v - 20) % 10] || s[v] || s[0];
   };
 
+  // 2. CRON & DATA SYNC
   useEffect(() => {
     if (scheduleType === "once") {
       const desc = "Executes immediately upon creation";
       setHumanReadable(desc);
-      updateData({ schedule_description: desc, is_scheduled: false });
+      updateData({
+        schedule_description: desc,
+        is_scheduled: false,
+        execution_time: "",
+        cron_expression: "",
+      });
       return;
     }
 
-    const [hh, mm] = time.split(":");
+    const [hh, mm] = time ? time.split(":") : ["00", "00"];
     let cron = "";
 
     switch (freq) {
@@ -104,11 +145,15 @@ export function Step3Scheduling({ data, updateData }: Step3Props) {
     const desc = generateDescription(freq, time, dayOfWeek, dayOfMonth);
     setHumanReadable(desc);
 
-    // Save both the technical Cron and the friendly Text
+    // Save all fields to parent to ensure persistence
     updateData({
       cron_expression: cron,
       schedule_description: desc,
       is_scheduled: true,
+      execution_time: time,
+      frequency: freq,
+      day_of_week: dayOfWeek,
+      day_of_month: dayOfMonth,
     });
   }, [freq, time, dayOfWeek, dayOfMonth, scheduleType]);
 
@@ -130,10 +175,7 @@ export function Step3Scheduling({ data, updateData }: Step3Props) {
         {(["once", "recurring"] as const).map((mode) => (
           <button
             key={mode}
-            onClick={() => {
-              setScheduleType(mode);
-              updateData({ is_scheduled: mode === "recurring" });
-            }}
+            onClick={() => setScheduleType(mode)}
             className={cn(
               "flex-1 flex items-center justify-center gap-2 py-3 rounded-[1.5rem] font-black text-[11px] uppercase tracking-wider transition-all",
               scheduleType === mode
@@ -305,7 +347,7 @@ export function Step3Scheduling({ data, updateData }: Step3Props) {
                 <p className="text-lg font-mono text-white tracking-wider">
                   {scheduleType === "once"
                     ? "N/A"
-                    : data.cron_expression || "* * * * *"}
+                    : data.cron_expression || "Waiting..."}
                 </p>
               </div>
             </div>
