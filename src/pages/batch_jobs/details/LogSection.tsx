@@ -1,17 +1,43 @@
-import { RotateCcw, CheckCircle2, XCircle, Clock } from "lucide-react";
+import {
+  RotateCcw,
+  CheckCircle2,
+  XCircle,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
 
 interface LogSectionProps {
   logs: any[];
   errors: any[];
+  meta: any; // Added for pagination metadata
+  currentPage: number;
+  perPage: number;
+  onPageChange: (page: number) => void;
+  onPerPageChange: (limit: number) => void;
   onRetryFailed: () => void;
+  onFilterChange: (status: string) => void;
 }
 
 export const LogSection = ({
   logs,
   errors,
+  meta,
+  currentPage,
+  perPage,
+  onPageChange,
+  onPerPageChange,
   onRetryFailed,
+  onFilterChange,
 }: LogSectionProps) => {
+  const [activeTab, setActiveTab] = useState("All");
+
+  const handleTabClick = (tab: string) => {
+    setActiveTab(tab);
+    onFilterChange(tab);
+  };
+
   return (
     <div className="grid grid-cols-12 gap-6 items-start">
       {/* Error Analysis Sidebar */}
@@ -56,13 +82,19 @@ export const LogSection = ({
       </div>
 
       {/* Main Logs Table */}
-      <div className="col-span-8 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+      <div className="col-span-8 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white">
           <div className="flex p-1 bg-slate-50 rounded-lg border border-slate-200">
             {["All", "Success", "Failed", "Pending"].map((tab) => (
               <button
                 key={tab}
-                className="px-4 py-1.5 text-xs font-semibold rounded-md transition-all hover:bg-white hover:shadow-sm"
+                onClick={() => handleTabClick(tab)}
+                className={cn(
+                  "px-4 py-1.5 text-xs font-semibold rounded-md transition-all",
+                  activeTab === tab
+                    ? "bg-white shadow-sm text-indigo-600"
+                    : "text-slate-500 hover:text-slate-700",
+                )}
               >
                 {tab}
               </button>
@@ -101,9 +133,6 @@ export const LogSection = ({
               {logs.length > 0 ? (
                 logs.map((log) => {
                   const isSuccess = log.result?.is_successful;
-                  const identifier =
-                    log.payloads?.request?.data?.subscriberNumber || "N/A";
-
                   return (
                     <tr
                       key={log.id}
@@ -127,7 +156,7 @@ export const LogSection = ({
                       </td>
                       <td className="px-6 py-4">
                         <code className="text-xs font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
-                          {identifier}
+                          {log.metadata?.identifier || "N/A"}
                         </code>
                       </td>
                       <td className="px-6 py-4 text-xs text-slate-500 font-medium">
@@ -145,12 +174,64 @@ export const LogSection = ({
                     colSpan={5}
                     className="px-6 py-12 text-center text-slate-400 text-sm italic"
                   >
-                    No command logs found for this instance.
+                    No {activeTab !== "All" ? activeTab.toLowerCase() : ""}{" "}
+                    command logs found.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Updated Pagination Footer */}
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/30 flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 font-medium">Show:</span>
+              <select
+                value={perPage}
+                onChange={(e) => onPerPageChange(Number(e.target.value))}
+                className="bg-white border border-slate-200 rounded-md px-2 py-1 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                {[5, 10, 15, 20, 25].map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <span className="text-xs text-slate-400 font-medium">
+              Showing {meta?.from || 0} - {meta?.to || 0} of {meta?.total || 0}{" "}
+              logs
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              disabled={currentPage === 1}
+              onClick={() => onPageChange(currentPage - 1)}
+              className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-50 hover:bg-slate-50 transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-1 px-2">
+              <span className="text-xs font-bold text-slate-700">
+                Page {currentPage}
+              </span>
+              <span className="text-xs text-slate-400">
+                of {meta?.last_page || 1}
+              </span>
+            </div>
+
+            <button
+              disabled={currentPage === (meta?.last_page || 1)}
+              onClick={() => onPageChange(currentPage + 1)}
+              className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-50 hover:bg-slate-50 transition-colors"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
