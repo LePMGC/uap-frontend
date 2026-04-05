@@ -8,9 +8,16 @@ import {
   Pause,
   Square,
   Copy,
+  Download,
 } from "lucide-react";
 
-export const JobConfigurationHeader = ({ data }: { data: any }) => {
+export const JobConfigurationHeader = ({
+  data,
+  onExportReport,
+}: {
+  data: any;
+  onExportReport: () => void;
+}) => {
   // 1. Safety Check: If data hasn't loaded yet, show a placeholder or return null
   if (!data)
     return (
@@ -95,6 +102,13 @@ export const JobConfigurationHeader = ({ data }: { data: any }) => {
           </button>
           <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50">
             <Copy className="w-4 h-4" /> Clone
+          </button>
+          <button
+            onClick={onExportReport}
+            className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm"
+          >
+            <Download className="w-4 h-4 text-indigo-600" />
+            Export Report
           </button>
         </div>
       </div>

@@ -22,26 +22,22 @@ export default function BatchJobDetailsPage() {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(5);
 
-  // 1. Memoize the instance list fetcher so it can be called after polling ends
   const refreshInstanceList = useCallback(async () => {
     if (!id) return;
     try {
       const instancesResponse = await batchJobsService.getInstances(id);
-      const instanceList = instancesResponse.data?.data || [];
-      setInstances(instanceList);
+      setInstances(instancesResponse.data?.data || []);
     } catch (error) {
       console.error("Failed to refresh instance list", error);
     }
   }, [id]);
 
-  // 2. Memoize the fetch function so it can be reused in polling
   const fetchInstanceData = useCallback(
     async (isSilent = false) => {
       if (!selectedInstanceId) return;
       try {
         const statusFilter =
           logStatus !== "All" ? logStatus.toLowerCase() : undefined;
-
         const [details, logResponse] = await Promise.all([
           batchJobsService.getInstanceDetails(selectedInstanceId),
           commandService.getCommandLogs(page, perPage, {
@@ -49,31 +45,25 @@ export default function BatchJobDetailsPage() {
             status: statusFilter,
           }),
         ]);
-
         setInstanceDetails(details.data);
         setLogs(logResponse.data || []);
         setLogMeta(logResponse.meta || null);
       } catch (error) {
-        if (!isSilent) {
-          showToast("Failed to refresh instance data", "error");
-        }
+        if (!isSilent) showToast("Failed to refresh instance data", "error");
       }
     },
     [selectedInstanceId, logStatus, page, perPage, showToast],
   );
 
-  // Initial Load: Template Configuration and Instances
   useEffect(() => {
     const initPage = async () => {
       if (!id) return;
       try {
         setIsLoading(true);
-        // Fetch config and initial instances list
         const [configResponse] = await Promise.all([
           batchJobsService.getById(id),
           refreshInstanceList(),
         ]);
-
         setJobConfig(configResponse.data || configResponse);
       } catch (error) {
         showToast("Failed to load job details", "error");
@@ -84,34 +74,29 @@ export default function BatchJobDetailsPage() {
     initPage();
   }, [id, showToast, refreshInstanceList]);
 
-  // Set initial selection when the instances list is first loaded
   useEffect(() => {
     if (instances.length > 0 && !selectedInstanceId) {
       setSelectedInstanceId(instances[0].id.toString());
     }
   }, [instances, selectedInstanceId]);
 
-  // Trigger fetch when filters or selection changes
   useEffect(() => {
     fetchInstanceData();
   }, [fetchInstanceData]);
 
-  // 3. Setup Polling Interval with final status check
   useEffect(() => {
     let interval: number | undefined;
-
-    const status = instanceDetails?.status;
-    const isOngoing = status === "processing" || status === "pending";
-
+    const isOngoing =
+      instanceDetails?.status === "processing" ||
+      instanceDetails?.status === "pending";
     if (isOngoing && selectedInstanceId) {
-      interval = window.setInterval(() => {
-        fetchInstanceData(true);
-      }, 3000);
-    } else if (status === "completed" || status === "failed") {
-      // Refresh the dropdown data once the job finishes to show completion time
+      interval = window.setInterval(() => fetchInstanceData(true), 3000);
+    } else if (
+      instanceDetails?.status === "completed" ||
+      instanceDetails?.status === "failed"
+    ) {
       refreshInstanceList();
     }
-
     return () => {
       if (interval) window.clearInterval(interval);
     };
@@ -122,10 +107,34 @@ export default function BatchJobDetailsPage() {
     refreshInstanceList,
   ]);
 
+  // Export/Retry Handlers
+  const handleExportReport = () => {
+    // showToast("Generating instance report...", "info");
+    // API Call: batchJobsService.downloadReport(selectedInstanceId)
+  };
+
+  const handleExportAllErrors = () => {
+    // showToast("Exporting error list...", "info");
+  };
+
+  const handleExportByCode = (code: string) => {
+    // showToast(`Exporting logs for ${code}...`, "info");
+  };
+
+  const handleRetryByCode = async (code: string) => {
+    try {
+      // showToast(`Retry initiated for error: ${code}`, "info");
+      await batchJobsService.retryByErrorCode(selectedInstanceId, code);
+      fetchInstanceData();
+    } catch (error) {
+      showToast("Retry failed", "error");
+    }
+  };
+
   if (isLoading || !jobConfig) {
     return (
-      <div className="p-8 text-center text-slate-500 font-medium">
-        Loading...
+      <div className="p-8 text-center text-slate-500 font-medium italic">
+        Loading dashboard...
       </div>
     );
   }
@@ -133,7 +142,12 @@ export default function BatchJobDetailsPage() {
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
       <div className="p-8 max-w-[1600px] mx-auto space-y-8">
-        <JobConfigurationHeader data={jobConfig} />
+        {/* Full-width Header with integrated Export button */}
+        <JobConfigurationHeader
+          data={jobConfig}
+          onExportReport={handleExportReport}
+        />
+
         <hr className="border-slate-200" />
 
         <ExecutionStats
@@ -151,6 +165,7 @@ export default function BatchJobDetailsPage() {
         <LogSection
           logs={logs}
           meta={logMeta}
+          stats={instanceDetails}
           currentPage={page}
           perPage={perPage}
           onPageChange={setPage}
@@ -159,15 +174,18 @@ export default function BatchJobDetailsPage() {
             setPage(1);
           }}
           errors={instanceDetails?.error_analysis || []}
-          onRetryFailed={() => {
-            batchJobsService
-              .retryFailedRecords(selectedInstanceId)
-              .then(() => {
-                showToast("Retry triggered", "success");
-                fetchInstanceData();
-              })
-              .catch(() => showToast("Retry failed", "error"));
+          onRetryFailed={async () => {
+            try {
+              await batchJobsService.retryFailedRecords(selectedInstanceId);
+              showToast("Global retry triggered", "success");
+              fetchInstanceData();
+            } catch (e) {
+              showToast("Retry failed", "error");
+            }
           }}
+          onRetryByCode={handleRetryByCode}
+          onExportByCode={handleExportByCode}
+          onExportAllErrors={handleExportAllErrors}
           onFilterChange={(status) => {
             setLogStatus(status);
             setPage(1);

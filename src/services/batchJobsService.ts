@@ -111,4 +111,42 @@ export const batchJobsService = {
     );
     return response.data;
   },
+
+  retryByErrorCode: async (instanceId: string | number, errorCode: string) => {
+    const response = await api.post(
+      `/batch/instances/${instanceId}/retry-by-error`,
+      { error_code: errorCode },
+    );
+    return response.data;
+  },
+
+  downloadReport: async (instanceId: string | number) => {
+    const response = await api.get(
+      `/batch/instances/${instanceId}/download-report`,
+      { responseType: "blob" },
+    );
+    return response.data; // This will be a Blob for file download
+  },
+
+  exportErrorsByCode: async (
+    instanceId: string | number,
+    errorCode: string,
+  ) => {
+    const response = await api.get(
+      `/batch/instances/${instanceId}/export-errors`,
+      {
+        params: { error_code: errorCode },
+        responseType: "blob",
+      },
+    );
+    return response.data; // This will be a Blob for file download
+  },
+
+  exportAllErrors: async (instanceId: string | number) => {
+    const response = await api.get(
+      `/batch/instances/${instanceId}/export-all-errors`,
+      { responseType: "blob" },
+    );
+    return response.data; // This will be a Blob for file download
+  },
 };
