@@ -6,10 +6,12 @@ import {
   ChevronRight,
   Download,
   FileDown,
+  Eye, // Added Eye icon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { InstanceInfoCard } from "./InstanceInfoCard";
+import { PayloadDetailsDrawer } from "@/components/commands_logs/PayloadDetailsDrawer"; // Import the drawer
 
 interface LogSectionProps {
   logs: any[];
@@ -24,6 +26,7 @@ interface LogSectionProps {
   onExportByCode: (code: string) => void;
   onExportAllErrors: () => void;
   onFilterChange: (status: string) => void;
+  onDownloadSource: (id: string) => void;
   stats: any;
 }
 
@@ -40,20 +43,32 @@ export const LogSection = ({
   onExportByCode,
   onExportAllErrors,
   onFilterChange,
+  onDownloadSource,
   stats,
 }: LogSectionProps) => {
   const [activeTab, setActiveTab] = useState("All");
+
+  // Drawer States
+  const [selectedLog, setSelectedLog] = useState<any | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const handleTabClick = (tab: string) => {
     setActiveTab(tab);
     onFilterChange(tab);
   };
 
+  const handleOpenDrawer = (log: any) => {
+    setSelectedLog(log);
+    setIsDrawerOpen(true);
+  };
+
   return (
     <div className="grid grid-cols-12 gap-6 items-start">
+      {/* Left Column: Stats & Error Analysis */}
       <div className="col-span-4 space-y-6">
-        <InstanceInfoCard stats={stats} />
+        <InstanceInfoCard stats={stats} onDownloadSource={onDownloadSource} />
 
+        {/* ... (Keep your existing Error Analysis Table code here) ... */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-4 border-b border-slate-100 flex items-center justify-between font-bold text-slate-800">
             <div className="flex items-center gap-2">
@@ -63,10 +78,17 @@ export const LogSection = ({
               Error Analysis
             </div>
             <button
+              onClick={onRetryFailed}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold text-slate-600 hover:text-indigo-600 hover:bg-white border border-transparent hover:border-slate-200 rounded-md transition-all uppercase tracking-wider"
+            >
+              <RotateCcw className="w-3 h-43" /> Retry Failed
+            </button>
+            <button
               onClick={onExportAllErrors}
               className="text-[10px] uppercase tracking-wider text-indigo-600 hover:text-indigo-800 flex items-center gap-1 font-bold bg-indigo-50 px-2 py-1 rounded"
             >
-              <FileDown className="w-3 h-3" /> Full Export
+              <FileDown className="w-3 h-3" />
+              Export All
             </button>
           </div>
           <div className="p-4">
@@ -124,6 +146,7 @@ export const LogSection = ({
         </div>
       </div>
 
+      {/* Right Column: Logs Table */}
       <div className="col-span-8 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white">
           <div className="flex p-1 bg-slate-50 rounded-lg border border-slate-200">
@@ -142,12 +165,6 @@ export const LogSection = ({
               </button>
             ))}
           </div>
-          <button
-            onClick={onRetryFailed}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm shadow-indigo-200 hover:bg-indigo-700 transition-colors"
-          >
-            <RotateCcw className="w-4 h-4" /> Retry Failed
-          </button>
         </div>
 
         <div className="overflow-x-auto">
@@ -166,6 +183,12 @@ export const LogSection = ({
                 <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase text-right">
                   Timestamp
                 </th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase text-right">
+                  Duration
+                </th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase text-center">
+                  Payloads
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -174,7 +197,7 @@ export const LogSection = ({
                 return (
                   <tr
                     key={log.id}
-                    className="hover:bg-slate-50/50 transition-colors"
+                    className="hover:bg-slate-50/50 transition-colors group"
                   >
                     <td className="px-6 py-4">
                       {isSuccess ? (
@@ -198,6 +221,20 @@ export const LogSection = ({
                     <td className="px-6 py-4 text-right text-xs text-slate-400 font-medium">
                       {log.metadata?.timestamp}
                     </td>
+                    <td className="px-6 py-4 text-right text-xs text-slate-400 font-medium">
+                      {log.metadata?.execution_time
+                        ? `${log.metadata.execution_time}s`
+                        : "N/A"}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <button
+                        onClick={() => handleOpenDrawer(log)}
+                        className="inline-flex items-center justify-center p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                        title="View Payloads"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
@@ -205,6 +242,7 @@ export const LogSection = ({
           </table>
         </div>
 
+        {/* ... (Keep your existing Pagination code here) ... */}
         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/30 flex justify-between items-center">
           <div className="flex items-center gap-4 text-xs font-medium">
             <span className="text-slate-500">Show:</span>
@@ -245,6 +283,13 @@ export const LogSection = ({
           </div>
         </div>
       </div>
+
+      {/* Render the Drawer */}
+      <PayloadDetailsDrawer
+        log={selectedLog}
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+      />
     </div>
   );
 };

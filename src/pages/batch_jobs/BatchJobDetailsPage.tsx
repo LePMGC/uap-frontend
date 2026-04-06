@@ -114,11 +114,23 @@ export default function BatchJobDetailsPage() {
   };
 
   const handleExportAllErrors = () => {
-    // showToast("Exporting error list...", "info");
+    batchJobsService
+      .exportAllErrors(selectedInstanceId)
+      .then(() => {
+        showToast("Report download initiated", "success");
+      })
+      .catch(() => {
+        showToast("Failed to download report", "error");
+      });
   };
 
-  const handleExportByCode = (code: string) => {
-    // showToast(`Exporting logs for ${code}...`, "info");
+  const handleExportByCode = async (code: string) => {
+    try {
+      showToast(`Exporting ${code} records...`, "success");
+      await batchJobsService.exportErrorsByCode(selectedInstanceId, code);
+    } catch (error) {
+      showToast("Export failed", "error");
+    }
   };
 
   const handleRetryByCode = async (code: string) => {
@@ -128,6 +140,15 @@ export default function BatchJobDetailsPage() {
       fetchInstanceData();
     } catch (error) {
       showToast("Retry failed", "error");
+    }
+  };
+
+  const handleDownloadSource = async (instanceId: string) => {
+    try {
+      await batchJobsService.downloadSourceFile(instanceId);
+      showToast("Source file download initiated", "success");
+    } catch (error) {
+      showToast("Failed to download source file", "error");
     }
   };
 
@@ -190,6 +211,7 @@ export default function BatchJobDetailsPage() {
             setLogStatus(status);
             setPage(1);
           }}
+          onDownloadSource={handleDownloadSource}
         />
       </div>
     </div>

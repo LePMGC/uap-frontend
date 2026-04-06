@@ -91,16 +91,28 @@ export const JobConfigurationHeader = ({
           </div>
         </div>
         <div className="flex gap-2">
-          <button className="px-4 py-2 border border-indigo-200 text-indigo-600 rounded-lg text-sm font-semibold hover:bg-indigo-50 flex items-center gap-2">
+          <button
+            disabled
+            className="px-4 py-2 border border-indigo-200 text-indigo-600 rounded-lg text-sm font-semibold hover:bg-indigo-50 flex items-center gap-2"
+          >
             <Edit3 className="w-4 h-4" /> Edit Configuration
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-amber-200 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-50">
+          <button
+            disabled
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-amber-200 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-50"
+          >
             <Pause className="w-4 h-4" /> Pause Job
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-red-200 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50">
+          <button
+            disabled
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-red-200 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50"
+          >
             <Square className="w-4 h-4 fill-current" /> Stop
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50">
+          <button
+            disabled
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50"
+          >
             <Copy className="w-4 h-4" /> Clone
           </button>
           <button

@@ -1,7 +1,15 @@
-import { Calendar, Clock, Timer, Activity } from "lucide-react";
+import { Calendar, Clock, Timer, Activity, FileDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export const InstanceInfoCard = ({ stats }: { stats: any }) => {
+interface InstanceInfoCardProps {
+  stats: any;
+  onDownloadSource?: (instanceId: string) => void;
+}
+
+export const InstanceInfoCard = ({
+  stats,
+  onDownloadSource,
+}: InstanceInfoCardProps) => {
   if (!stats) return null;
 
   const formatDate = (dateString: string) => {
@@ -34,25 +42,35 @@ export const InstanceInfoCard = ({ stats }: { stats: any }) => {
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-6">
-      <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+      <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
         <div className="flex items-center gap-2 font-bold text-slate-800">
           <Activity className="w-4 h-4 text-indigo-500" />
           Instance Information
         </div>
-        <span
-          className={cn(
-            "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border",
-            statusColors[stats.status] || "bg-slate-50 text-slate-600",
-          )}
-        >
-          {stats.status}
-        </span>
+
+        <div className="flex items-center gap-3">
+          {/* New Download Source Button */}
+          <button
+            onClick={() => onDownloadSource?.(stats.instance_id)}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold text-slate-600 hover:text-indigo-600 hover:bg-white border border-transparent hover:border-slate-200 rounded-md transition-all uppercase tracking-wider"
+          >
+            <FileDown className="w-3.5 h-3.5" />
+            Export Source
+          </button>
+
+          <span
+            className={cn(
+              "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border",
+              statusColors[stats.status] || "bg-slate-50 text-slate-600",
+            )}
+          >
+            {stats.status}
+          </span>
+        </div>
       </div>
 
       <div className="p-4">
-        {/* Single Row Layout for Time Metrics */}
         <div className="grid grid-cols-3 gap-4">
-          {/* Started At */}
           <div className="flex items-center gap-3 border-r border-slate-100">
             <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
             <div>
@@ -65,7 +83,6 @@ export const InstanceInfoCard = ({ stats }: { stats: any }) => {
             </div>
           </div>
 
-          {/* Completed At */}
           <div className="flex items-center gap-3 border-r border-slate-100">
             <Clock className="w-4 h-4 text-slate-400 shrink-0" />
             <div>
@@ -78,7 +95,6 @@ export const InstanceInfoCard = ({ stats }: { stats: any }) => {
             </div>
           </div>
 
-          {/* Duration */}
           <div className="flex items-center gap-3">
             <Timer className="w-4 h-4 text-slate-400 shrink-0" />
             <div>

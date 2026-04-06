@@ -139,7 +139,23 @@ export const batchJobsService = {
         responseType: "blob",
       },
     );
-    return response.data; // This will be a Blob for file download
+
+    // Trigger the browser download
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute(
+      "download",
+      `errors_${errorCode}_instance_${instanceId}.csv`,
+    );
+    document.body.appendChild(link);
+    link.click();
+
+    // Cleanup
+    link.parentNode?.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    return response.data;
   },
 
   exportAllErrors: async (instanceId: string | number) => {
@@ -147,6 +163,71 @@ export const batchJobsService = {
       `/batch/instances/${instanceId}/export-all-errors`,
       { responseType: "blob" },
     );
-    return response.data; // This will be a Blob for file download
+
+    // Trigger the browser download
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `all_errors_instance_${instanceId}.csv`);
+    document.body.appendChild(link);
+    link.click();
+
+    // Cleanup
+    link.parentNode?.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    return response.data;
+  },
+
+  downloadSourceFile: async (instanceId: string | number) => {
+    const response = await api.get(
+      `/batch/instances/${instanceId}/download-source`,
+      { responseType: "blob" },
+    );
+
+    // Trigger the browser download
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `source_instance_${instanceId}.csv`);
+    document.body.appendChild(link);
+    link.click();
+
+    // Cleanup
+    link.parentNode?.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    return response.data;
+  },
+
+  downloadSampleInputFile: async () => {
+    try {
+      const response = await api.get(
+        `/batch/templates/download-sample-source-file`,
+        {
+          responseType: "blob", // Critical for receiving file data
+        },
+      );
+
+      // Create a local URL for the binary data
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+
+      // Define the filename
+      const filename = `sample_template_${"generic"}.csv`;
+      link.setAttribute("download", filename);
+
+      // Append, trigger, and cleanup
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      return true;
+    } catch (error) {
+      console.error("Download failed:", error);
+      throw error;
+    }
   },
 };
