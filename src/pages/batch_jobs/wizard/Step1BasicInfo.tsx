@@ -7,6 +7,7 @@ import {
   Globe,
   ChevronDown,
   AlertCircle,
+  Loader2,
 } from "lucide-react";
 import { providerInstanceService } from "@/services/providerInstanceService";
 import { commandService } from "@/services/commandService";
@@ -34,13 +35,34 @@ export function Step1BasicInfo({ data, updateData, onConfirm }: Step1Props) {
 
   /* ---------------- VALIDATION LOGIC ---------------- */
 
-  // Basic info must be present before allowing source configuration/preview
+  // 1. Basic Identity Check
   const isBasicInfoValid =
     !!data.name?.trim() && !!data.provider_instance_id && !!data.command_id;
 
-  // Source-specific validation (can be expanded based on specific source requirements)
-  const isSourceConfigured = !!data.source_type;
+  // 2. Deep Source Config Check
+  const isSourceConfigured = (() => {
+    if (!data.source_type) return false;
+    const config = data.source_config || {};
 
+    switch (data.source_type) {
+      case "upload":
+        // Valid if a file was uploaded and a path returned by the server
+        return !!config.temporary_path;
+      case "database":
+        // Valid if connection selected and either a table or custom query is set
+        return (
+          !!config.connection_id && (!!config.table_name || !!config.query)
+        );
+      case "sftp":
+        return !!config.connection_id && !!config.path;
+      case "api":
+        return !!config.connection_id;
+      default:
+        return false;
+    }
+  })();
+
+  // 3. Overall Step 1 logic
   const canTriggerPreview = isBasicInfoValid && isSourceConfigured;
 
   /* ---------------- MAPPING STRATEGIES ---------------- */
@@ -92,6 +114,47 @@ export function Step1BasicInfo({ data, updateData, onConfirm }: Step1Props) {
     };
     fetchCommands();
   }, [data.provider_instance_id, instances]);
+
+  // src/components/batch-jobs/Step1BasicInfo.tsx
+
+  useEffect(() => {
+    const config = data.source_config || {};
+    const isBasicValid =
+      !!data.name?.trim() && !!data.provider_instance_id && !!data.command_id;
+
+    let isSourceValid = false;
+
+    switch (data.source_type) {
+      case "upload":
+        // Valid if a file has been uploaded (server returned temporary_path)
+        isSourceValid = !!config.temporary_path;
+        break;
+      case "database":
+        // Valid if connection is chosen and either table or custom query is provided
+        isSourceValid =
+          !!config.connection_id && (!!config.table_name || !!config.query);
+        break;
+      case "sftp":
+        isSourceValid = !!config.connection_id && !!config.path;
+        break;
+      case "api":
+        isSourceValid = !!config.connection_id;
+        break;
+      default:
+        isSourceValid = false;
+    }
+
+    // Update the parent state
+    if (data.step1Valid !== (isBasicValid && isSourceValid)) {
+      updateData({ step1Valid: isBasicValid && isSourceValid });
+    }
+  }, [
+    data.name,
+    data.provider_instance_id,
+    data.command_id,
+    data.source_type,
+    data.source_config,
+  ]);
 
   /* ---------------- HANDLERS ---------------- */
 
@@ -172,6 +235,7 @@ export function Step1BasicInfo({ data, updateData, onConfirm }: Step1Props) {
             />
           </div>
 
+          {/* UPDATED SECTION: PROVIDER INSTANCE WITH STATUS INDICATORS */}
           <div className="space-y-2">
             <label className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">
               Provider Instance
@@ -191,17 +255,32 @@ export function Step1BasicInfo({ data, updateData, onConfirm }: Step1Props) {
                     command_name: "",
                   });
                 }}
-                className="w-full h-12 px-10 rounded-2xl border border-slate-200 appearance-none bg-white font-medium outline-none transition-all"
+                className={cn(
+                  "w-full h-12 px-10 rounded-2xl border border-slate-200 appearance-none bg-white font-medium outline-none transition-all",
+                  loading.instances && "opacity-50",
+                )}
+                disabled={loading.instances}
               >
-                <option value="">Select an instance...</option>
+                <option value="">
+                  {loading.instances
+                    ? "Loading instances..."
+                    : "Select an instance..."}
+                </option>
                 {instances.map((inst) => (
                   <option key={inst.id} value={inst.id}>
-                    {inst.name}
+                    {inst.is_active ? "🟢" : "🔴"} {inst.name}{" "}
+                    {inst.is_active ? "" : "(Inactive)"}
                   </option>
                 ))}
               </select>
-              <Server className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                {loading.instances ? (
+                  <Loader2 className="h-4 w-4 text-indigo-500 animate-spin" />
+                ) : (
+                  <Server className="h-4 w-4 text-slate-400" />
+                )}
+              </div>
+              <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
             </div>
           </div>
 

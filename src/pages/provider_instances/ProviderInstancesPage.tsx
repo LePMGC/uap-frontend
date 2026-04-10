@@ -126,6 +126,22 @@ export default function ProviderInstancesPage() {
         </span>
       ),
     },
+    {
+      header: "TPS Limit",
+      accessor: (item: any) => (
+        <span className="text-xs font-bold text-slate-600">
+          {item.tps_limit || "N/A"}
+        </span>
+      ),
+    },
+    {
+      header: "latency (ms)",
+      accessor: (item: any) => (
+        <span className="text-xs font-bold text-slate-600">
+          {item.latency_ms !== null ? item.latency_ms : "N/A"}
+        </span>
+      ),
+    },
   ];
 
   const filterConfigs = [

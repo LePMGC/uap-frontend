@@ -22,7 +22,6 @@ export default function ProviderInstanceFormPage() {
 
   // 1. Centralized Validation Logic
   const validateForm = () => {
-    // Check top-level identity
     if (!name.trim()) {
       showToast("Instance Name is required", "error");
       return false;
@@ -32,8 +31,12 @@ export default function ProviderInstanceFormPage() {
       return false;
     }
 
-    // Check dynamic settings based on category
-    const requiredFields = ["host", "port", "username", "password"];
+    // Updated required fields list to include tps_limit
+    const requiredFields = ["host", "username", "password", "tps_limit"];
+
+    // Port is required for everything EXCEPT leap (which uses a URL)
+    if (category !== "leap") requiredFields.push("port");
+
     if (category === "ericsson-ucip") requiredFields.push("user_agent");
 
     for (const field of requiredFields) {

@@ -33,6 +33,7 @@ export default function CreateBatchJobPage() {
     cron_expression: "",
     starts_at: "", // Added to resolve TS2339
     ends_at: "", // Added to resolve TS2339
+    step1Valid: false,
     step2Valid: false,
     step3Valid: false,
   });
@@ -191,13 +192,14 @@ export default function CreateBatchJobPage() {
               <button
                 onClick={currentStep === 4 ? handleFinalize : handleNext}
                 disabled={
-                  (currentStep === 1 && !formData.command_id) ||
+                  (currentStep === 1 && !formData.step1Valid) || // 👈 Use step1Valid here
                   (currentStep === 2 && !formData.step2Valid) ||
                   (currentStep === 3 && !formData.step3Valid)
                 }
                 className={cn(
                   "px-5 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all",
-                  (currentStep === 2 && !formData.step2Valid) ||
+                  (currentStep === 1 && !formData.step1Valid) || // 👈 And here
+                    (currentStep === 2 && !formData.step2Valid) ||
                     (currentStep === 3 && !formData.step3Valid)
                     ? "bg-slate-100 text-slate-400 cursor-not-allowed"
                     : "bg-indigo-600 text-white hover:bg-indigo-700",

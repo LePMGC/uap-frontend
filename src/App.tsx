@@ -20,6 +20,7 @@ import CommandLogsPage from "./pages/commands_logs/CommandLogsPage";
 import BatchJobsPage from "./pages/batch_jobs/BatchJobsPage";
 import CreateBatchJobPage from "./pages/batch_jobs/wizard";
 import BatchJobDetailsPage from "./pages/batch_jobs/BatchJobDetailsPage";
+import LeapJourneyPage from "./pages/leap_logs";
 
 export default function App() {
   const { isAuthenticated, needsPasswordChange } = useAuthStore();
@@ -98,6 +99,8 @@ export default function App() {
           <Route path="/batch-jobs/create" element={<CreateBatchJobPage />} />
 
           <Route path="/batch-jobs/:id" element={<BatchJobDetailsPage />} />
+
+          <Route path="/logs" element={<LeapJourneyPage />} />
 
           {/* 2. Catch-all for the protected area (the very last item in this block) */}
           <Route index element={<Navigate to="/dashboard" replace />} />

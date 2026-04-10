@@ -59,6 +59,19 @@ export function ProviderInstanceForm({
           placeholder="e.g. 3300"
         />
       </div>
+      {/* New TPS Limit Field */}
+      <div className="col-span-2">
+        <MandatoryLabel>TPS Limit (Transactions Per Second)</MandatoryLabel>
+        <input
+          required
+          type="number"
+          min="1"
+          value={settings.tps_limit || ""}
+          onChange={(e) => updateField("tps_limit", e.target.value)}
+          className="w-full mt-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold focus:bg-white outline-none"
+          placeholder="e.g. 10"
+        />
+      </div>
       <div>
         <MandatoryLabel>Username</MandatoryLabel>
         <input
@@ -128,6 +141,19 @@ export function ProviderInstanceForm({
             onChange={(e) => updateField("host", e.target.value)}
             className="w-full mt-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold outline-none focus:bg-white"
             placeholder="https://leap-service.internal/api/v1"
+          />
+        </div>
+        {/* New TPS Limit Field */}
+        <div className="col-span-2">
+          <MandatoryLabel>TPS Limit (Transactions Per Second)</MandatoryLabel>
+          <input
+            required
+            type="number"
+            min="1"
+            value={settings.tps_limit || ""}
+            onChange={(e) => updateField("tps_limit", e.target.value)}
+            className="w-full mt-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold focus:bg-white outline-none"
+            placeholder="e.g. 10"
           />
         </div>
         <div>
