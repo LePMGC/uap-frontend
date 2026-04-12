@@ -159,8 +159,7 @@ export default function ResultsPanel({ width, results }: ResultsPanelProps) {
                     : "bg-rose-50 text-rose-700 border-rose-100",
                 )}
               >
-                CODE:{" "}
-                {payloads?.response?.code || result?.response_code || "ERR"}
+                CODE: {payloads?.response?.code}
               </span>
               <span
                 className={cn(
