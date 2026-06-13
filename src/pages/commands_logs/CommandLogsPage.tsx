@@ -46,19 +46,17 @@ export default function CommandLogsPage() {
         filters,
       );
 
-      // Mapping logic for the provided payload:
-      // Data is in response.data, Pagination is in response.meta
       if (response && response.data) {
         setLogs(response.data);
 
         const meta = response.meta;
         setPagination({
-          current_page: meta.current_page,
-          total: meta.total,
-          last_page: meta.last_page,
-          per_page: meta.per_page,
-          from: meta.from,
-          to: meta.to,
+          current_page: meta?.current_page || 1,
+          total: meta?.total || 0,
+          last_page: meta?.last_page || 1,
+          per_page: meta?.per_page || 5,
+          from: meta?.from || 0,
+          to: meta?.to || 0,
         });
       }
     } catch (error) {
@@ -80,7 +78,7 @@ export default function CommandLogsPage() {
           <div
             className={cn(
               "h-8 w-8 rounded-lg flex items-center justify-center shrink-0",
-              item.result.is_successful
+              item?.result?.is_successful
                 ? "bg-indigo-50 text-indigo-600"
                 : "bg-red-50 text-red-600",
             )}
@@ -89,10 +87,10 @@ export default function CommandLogsPage() {
           </div>
           <div className="flex flex-col min-w-0">
             <span className="text-sm font-bold text-slate-800 truncate">
-              {item.command_info.name}
+              {item?.command_info?.name || "Unknown Command"}
             </span>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
-              {item.command_info.instance_name}
+              {item?.command_info?.instance_name || "Unknown Instance"}
             </span>
           </div>
         </div>
@@ -102,8 +100,9 @@ export default function CommandLogsPage() {
       header: "Target (MSISDN)",
       accessor: (item: any) => (
         <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded">
-          {/* Extracting subscriberNumber from the nested request data */}#{" "}
-          {item.payloads.request.data.subscriberNumber}
+          {/* Protected with optional chaining fallback for variable payload inputs */}
+          #{" "}
+          {item?.payloads?.request?.data?.subscriberNumber ?? "Raw / No MSISDN"}
         </span>
       ),
     },
@@ -115,15 +114,16 @@ export default function CommandLogsPage() {
           <span
             className={cn(
               "px-2.5 py-1 rounded-md text-[10px] font-bold uppercase",
-              item.result.is_successful
+              item?.result?.is_successful
                 ? "bg-green-100 text-green-700"
                 : "bg-red-100 text-red-700",
             )}
           >
-            {item.result.is_successful ? "SUCCESS" : "FAILED"}
+            {item?.result?.is_successful ? "SUCCESS" : "FAILED"}
           </span>
           <span className="text-[9px] font-bold text-slate-400">
-            Code: {item.payloads.response.code ?? "N/A"}
+            {/* 💡 Crucial Fix: Safe null evaluation for execution payload exceptions */}
+            Code: {item?.payloads?.response?.code ?? "N/A"}
           </span>
         </div>
       ),
@@ -136,7 +136,7 @@ export default function CommandLogsPage() {
             <User className="h-3 w-3 text-slate-500" />
           </div>
           <span className="text-sm font-bold text-slate-700">
-            {item.executed_by.username}
+            {item?.executed_by?.username || "System Component"}
           </span>
         </div>
       ),
@@ -147,7 +147,7 @@ export default function CommandLogsPage() {
         <div className="flex items-center gap-1.5 text-slate-500">
           <Clock className="h-3.5 w-3.5" />
           <span className="text-xs font-bold">
-            {item.metadata.execution_time}
+            {item?.metadata?.execution_time || "---"}
           </span>
         </div>
       ),
@@ -155,8 +155,11 @@ export default function CommandLogsPage() {
     {
       header: "Timestamp",
       accessor: (item: any) => {
-        // Split "2026-03-21 21:50:11" into Date and Time
-        const [date, time] = item.metadata.timestamp.split(" ");
+        const timestamp = item?.metadata?.timestamp;
+        if (!timestamp)
+          return <span className="text-xs text-slate-400">N/A</span>;
+
+        const [date, time] = timestamp.split(" ");
         return (
           <div className="flex flex-col">
             <span className="text-sm font-bold text-slate-700">{date}</span>
@@ -180,8 +183,9 @@ export default function CommandLogsPage() {
       label: "Edit & Retry",
       icon: <RotateCcw className="h-3.5 w-3.5" />,
       onClick: (item: any) => {
-        // Pass the log ID via query params
-        //navigate(`/single-execution?from_log=${item.id}`);
+        if (item?.id) {
+          navigate(`/single-execution?from_log=${item.id}`);
+        }
       },
     },
   ];

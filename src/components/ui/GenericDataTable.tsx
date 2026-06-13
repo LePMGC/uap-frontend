@@ -1,3 +1,4 @@
+// /var/www/html/uap-frontend/src/components/ui/GenericDataTable.tsx
 import React, { useEffect, useRef, useState } from "react";
 import {
   Search,
@@ -10,6 +11,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createPortal } from "react-dom";
+import { useAuthStore } from "@/store/authStore"; // Import auth state manager
 
 export interface FilterConfig {
   label: string;
@@ -30,6 +32,8 @@ export interface ActionItem<T> {
   onClick: (item: T) => void;
   variant?: "default" | "danger";
   hidden?: (item: T) => boolean;
+  /** Pass an array of string permissions. User needs at least one to view the action item. */
+  permissions?: string[];
 }
 
 interface PaginationMetadata {
@@ -49,6 +53,8 @@ interface GenericDataTableProps<T> {
   actions?: ActionItem<T>[];
   filters?: FilterConfig[];
   onAddClick?: () => void;
+  /** Pass a single string token required to view/trigger the Add button */
+  addPermission?: string;
   onExportClick?: () => void;
   searchPlaceholder?: string;
   isLoading?: boolean;
@@ -56,7 +62,6 @@ interface GenericDataTableProps<T> {
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (size: number) => void;
   onSearchChange?: (query: string) => void;
-  // Feature Toggles
   showAdd?: boolean;
   showExport?: boolean;
   titleSize?: string;
@@ -67,9 +72,10 @@ export function GenericDataTable<T>({
   subtitle,
   data,
   columns,
-  actions,
+  actions = [],
   filters = [],
   onAddClick,
+  addPermission,
   onExportClick,
   searchPlaceholder = "Search...",
   isLoading = false,
@@ -79,13 +85,18 @@ export function GenericDataTable<T>({
   onSearchChange,
   showAdd = true,
   showExport = true,
-  titleSize = "text-xl", // Defaulting to the original size
+  titleSize = "text-xl",
 }: GenericDataTableProps<T>) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 
-  // Close menu when clicking outside
+  // Pull active user authority configurations directly inside the loop
+  const userPermissions = useAuthStore(
+    (state) => state.user?.permissions || [],
+  );
+
+  // Sync menu state out when interacting with background layers
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -96,8 +107,19 @@ export function GenericDataTable<T>({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Determine if we should show the internal Actions column
-  const hasActions = actions && actions.length > 0;
+  // 1. Filter out actions if user lacks required permission tokens
+  const allowedActions = actions.filter((action) => {
+    if (!action.permissions || action.permissions.length === 0) return true;
+    return action.permissions.some((perm) => userPermissions.includes(perm));
+  });
+
+  // 2. Validate user holds specific clearances before making primary addition CTA visible
+  const isAdditionVisible =
+    showAdd &&
+    onAddClick &&
+    (!addPermission || userPermissions.includes(addPermission));
+
+  const hasActions = allowedActions.length > 0;
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-visible">
@@ -117,9 +139,8 @@ export function GenericDataTable<T>({
         </div>
       )}
 
-      {/* ROW 2: SEARCH, FILTERS, AND BUTTONS (UNIFIED) */}
+      {/* ROW 2: CONTROLS */}
       <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-4 bg-white">
-        {/* Unified Search & Filters */}
         <div className="flex flex-1 items-center gap-2 max-w-3xl">
           <div className="relative w-full max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
@@ -152,7 +173,6 @@ export function GenericDataTable<T>({
           </div>
         </div>
 
-        {/* Action Buttons */}
         <div className="flex items-center gap-2">
           {showExport && onExportClick && (
             <button
@@ -164,7 +184,7 @@ export function GenericDataTable<T>({
             </button>
           )}
 
-          {showAdd && onAddClick && (
+          {isAdditionVisible && (
             <button
               onClick={onAddClick}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg font-bold text-[11px] hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 active:scale-95"
@@ -176,7 +196,7 @@ export function GenericDataTable<T>({
         </div>
       </div>
 
-      {/* Main Table Content */}
+      {/* Main Table Layer */}
       <div className="overflow-x-auto overflow-y-visible relative">
         <table className="w-full border-collapse">
           <thead>
@@ -192,7 +212,6 @@ export function GenericDataTable<T>({
                   {column.header}
                 </th>
               ))}
-              {/* Conditional Internal Actions Header */}
               {hasActions && (
                 <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">
                   Actions
@@ -222,97 +241,92 @@ export function GenericDataTable<T>({
                 </td>
               </tr>
             ) : (
-              data.map((item, rowIdx) => {
-                return (
-                  <tr key={rowIdx} className="...">
-                    {columns.map((column, colIdx) => (
-                      <td
-                        key={colIdx}
-                        className={cn(
-                          "px-6 py-4 text-sm text-slate-600",
-                          column.className,
-                        )}
-                      >
-                        {typeof column.accessor === "function"
-                          ? column.accessor(item)
-                          : (item[column.accessor] as React.ReactNode)}
-                      </td>
-                    ))}
+              data.map((item, rowIdx) => (
+                <tr key={rowIdx}>
+                  {columns.map((column, colIdx) => (
+                    <td
+                      key={colIdx}
+                      className={cn(
+                        "px-6 py-4 text-sm text-slate-600",
+                        column.className,
+                      )}
+                    >
+                      {typeof column.accessor === "function"
+                        ? column.accessor(item)
+                        : (item[column.accessor] as React.ReactNode)}
+                    </td>
+                  ))}
 
-                    {hasActions && (
-                      <td className="px-6 py-4 text-right">
-                        <div className="relative flex justify-end">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
+                  {hasActions && (
+                    <td className="px-6 py-4 text-right">
+                      <div className="relative flex justify-end">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const rect =
+                              e.currentTarget.getBoundingClientRect();
+                            setMenuPosition({
+                              top: rect.bottom + window.scrollY,
+                              left: rect.right - 192 + window.scrollX,
+                            });
+                            setOpenMenuId(
+                              openMenuId === rowIdx ? null : rowIdx,
+                            );
+                          }}
+                          className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-900 transition-colors"
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </button>
 
-                              const rect =
-                                e.currentTarget.getBoundingClientRect();
+                        {openMenuId === rowIdx &&
+                          createPortal(
+                            <div
+                              ref={menuRef}
+                              className="fixed w-48 bg-white rounded-xl shadow-xl border border-slate-100 py-1 z-[9999]"
+                              style={{
+                                top: menuPosition.top,
+                                left: menuPosition.left,
+                              }}
+                            >
+                              {allowedActions.map((action, actionIdx) => {
+                                if (action.hidden?.(item)) return null;
 
-                              setMenuPosition({
-                                top: rect.bottom + window.scrollY,
-                                left: rect.right - 192 + window.scrollX,
-                              });
-
-                              setOpenMenuId(
-                                openMenuId === rowIdx ? null : rowIdx,
-                              );
-                            }}
-                            className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-900 transition-colors"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </button>
-
-                          {openMenuId === rowIdx &&
-                            createPortal(
-                              <div
-                                ref={menuRef}
-                                className="fixed w-48 bg-white rounded-xl shadow-xl border border-slate-100 py-1 z-[9999]"
-                                style={{
-                                  top: menuPosition.top,
-                                  left: menuPosition.left,
-                                }}
-                              >
-                                {actions.map((action, actionIdx) => {
-                                  if (action.hidden?.(item)) return null;
-
-                                  return (
-                                    <button
-                                      key={actionIdx}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        action.onClick(item);
-                                        setOpenMenuId(null);
-                                      }}
-                                      className={cn(
-                                        "w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold transition-colors",
-                                        action.variant === "danger"
-                                          ? "text-red-600 hover:bg-red-50"
-                                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
-                                      )}
-                                    >
-                                      {action.icon}
-                                      {typeof action.label === "function"
-                                        ? action.label(item)
-                                        : action.label}
-                                    </button>
-                                  );
-                                })}
-                              </div>,
-                              document.body,
-                            )}
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                );
-              })
+                                return (
+                                  <button
+                                    key={actionIdx}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      action.onClick(item);
+                                      setOpenMenuId(null);
+                                    }}
+                                    className={cn(
+                                      "w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold transition-colors",
+                                      action.variant === "danger"
+                                        ? "text-red-600 hover:bg-red-50"
+                                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
+                                    )}
+                                  >
+                                    {action.icon}
+                                    {typeof action.label === "function"
+                                      ? action.label(item)
+                                      : action.label}
+                                  </button>
+                                );
+                              })}
+                            </div>,
+                            document.body,
+                          )}
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              ))
             )}
           </tbody>
         </table>
       </div>
 
-      {/* Table Footer / Pagination Logic */}
+      {/* Pagination View Block */}
       {pagination && (
         <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
           <p className="text-[11px] font-bold text-slate-400">
@@ -327,7 +341,7 @@ export function GenericDataTable<T>({
                 Rows per page:
               </span>
               <select
-                className="bg-transparent text-[11px] font-bold text-slate-900 focus:outline-none"
+                className="bg-transparent text-[11px] font-bold text-slate-900 focus:outline-none cursor-pointer"
                 value={pagination.per_page}
                 onChange={(e) => onPageSizeChange?.(Number(e.target.value))}
               >

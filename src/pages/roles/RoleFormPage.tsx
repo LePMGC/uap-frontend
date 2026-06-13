@@ -1,3 +1,4 @@
+// /var/www/html/uap-frontend/src/pages/roles/RoleFormPage.tsx
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Save, CheckCircle, ArrowLeft } from "lucide-react";
@@ -5,11 +6,21 @@ import { cn } from "@/lib/utils";
 import type { Permission } from "@/types/roles";
 import { roleAndPermissionsService as roleService } from "@/services/roleService";
 import { useToastStore } from "@/hooks/useToastStore";
+import { useAuthStore } from "@/store/authStore";
+import { PERM } from "@/types/auth";
 
 export default function RoleFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const isEdit = Boolean(id && id !== "create");
+
+  // Auth Store Check
+  const userPermissions = useAuthStore(
+    (state) => state.user?.permissions || [],
+  );
+  const canSave =
+    userPermissions.includes(PERM.CREATE_ROLES) ||
+    userPermissions.includes(PERM.EDIT_ROLES);
 
   const [roleName, setRoleName] = useState("");
   const [selectedPerms, setSelectedPerms] = useState<number[]>([]);
@@ -20,6 +31,9 @@ export default function RoleFormPage() {
   const { showToast } = useToastStore();
 
   const togglePermission = (id: number) => {
+    // If the user doesn't have save/edit permissions, make the grid checkboxes read-only
+    if (!canSave) return;
+
     setSelectedPerms((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     );
@@ -47,6 +61,8 @@ export default function RoleFormPage() {
   }, [id, isEdit]);
 
   const handleSave = async () => {
+    if (!canSave) return;
+
     if (!roleName.trim()) {
       showToast("Please enter a role name", "error");
       return;
@@ -78,7 +94,6 @@ export default function RoleFormPage() {
       {/* Header Section */}
       <div className="flex items-center justify-between mb-8 pb-6 border-b border-slate-100">
         <div className="flex items-center gap-4">
-          {/* Uniform Back Button */}
           <button
             type="button"
             onClick={() => navigate("/roles")}
@@ -97,14 +112,16 @@ export default function RoleFormPage() {
           </div>
         </div>
 
-        {/* Standardized Save Button (Reduced height from py-3 to py-2) */}
-        <button
-          onClick={handleSave}
-          className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-lg font-bold text-[13px] hover:bg-slate-800 transition-all active:scale-95 shadow-md"
-        >
-          <Save className="h-3.5 w-3.5" />
-          {isEdit ? "Update Role Changes" : "Save New Role"}
-        </button>
+        {/* Guarded Action Trigger Button */}
+        {canSave && (
+          <button
+            onClick={handleSave}
+            className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-lg font-bold text-[13px] hover:bg-slate-800 transition-all active:scale-95 shadow-md"
+          >
+            <Save className="h-3.5 w-3.5" />
+            {isEdit ? "Update Role Changes" : "Save New Role"}
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
@@ -116,9 +133,15 @@ export default function RoleFormPage() {
             </label>
             <input
               value={roleName}
+              disabled={!canSave}
               onChange={(e) => setRoleName(e.target.value)}
               placeholder="e.g. Operator"
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all focus:bg-white"
+              className={cn(
+                "w-full px-4 py-3 border rounded-xl text-sm font-bold text-slate-900 outline-none transition-all",
+                canSave
+                  ? "bg-slate-50 border-slate-200 focus:ring-2 focus:ring-indigo-500/20 focus:bg-white"
+                  : "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed",
+              )}
             />
             <div className="mt-6 pt-6 border-t border-slate-50">
               <p className="text-[11px] text-slate-400 leading-relaxed">
@@ -131,28 +154,35 @@ export default function RoleFormPage() {
 
         {/* Right Panel: Permissions Grid */}
         <div className="lg:col-span-3 space-y-8">
-          {groups.map((group) => (
-            <div
-              key={group}
-              className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
-            >
-              <div className="px-6 py-4 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
-                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest">
-                  {group}
-                </h3>
-                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full uppercase">
-                  {allPermissions.filter((p) => p.group === group).length}{" "}
-                  Options
-                </span>
-              </div>
-              <div className="p-6 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                {allPermissions
-                  .filter((p) => p.group === group)
-                  .map((perm) => (
+          {groups.map((group) => {
+            const groupPerms = allPermissions.filter((p) => p.group === group);
+            const selectedInGroupCount = groupPerms.filter((p) =>
+              selectedPerms.includes(p.id),
+            ).length;
+            const totalInGroupCount = groupPerms.length;
+
+            return (
+              <div
+                key={group}
+                className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+              >
+                <div className="px-6 py-4 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
+                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest">
+                    {group}
+                  </h3>
+                  {/* Selected count over total count formatting applied here */}
+                  <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full uppercase">
+                    {selectedInGroupCount} / {totalInGroupCount} Options
+                  </span>
+                </div>
+                <div className="p-6 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                  {groupPerms.map((perm) => (
                     <label
                       key={perm.id}
                       className={cn(
-                        "relative flex items-center p-4 rounded-xl border-2 transition-all cursor-pointer group select-none",
+                        "relative flex items-center p-4 rounded-xl border-2 transition-all group select-none",
+                        !canSave && "cursor-not-allowed",
+                        canSave && "cursor-pointer",
                         selectedPerms.includes(perm.id)
                           ? "border-indigo-600 bg-indigo-50/30"
                           : "border-slate-100 hover:border-slate-200 hover:bg-slate-50/50",
@@ -161,6 +191,7 @@ export default function RoleFormPage() {
                       <input
                         type="checkbox"
                         className="hidden"
+                        disabled={!canSave}
                         checked={selectedPerms.includes(perm.id)}
                         onChange={() => togglePermission(perm.id)}
                       />
@@ -184,9 +215,10 @@ export default function RoleFormPage() {
                       )}
                     </label>
                   ))}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

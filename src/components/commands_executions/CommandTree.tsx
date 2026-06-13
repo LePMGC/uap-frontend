@@ -1,3 +1,4 @@
+// src/components/commands_executions/CommandTree.tsx
 import { useEffect, useState, useCallback } from "react";
 import {
   ChevronDown,
@@ -9,6 +10,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { commandService } from "@/services/commandService";
+import { useAuthStore } from "@/store/authStore";
+import { PERM } from "@/types/auth";
 
 interface CommandTreeProps {
   onSelect: (command: any) => void;
@@ -23,38 +26,100 @@ export default function CommandTree({ onSelect }: CommandTreeProps) {
   );
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  // Load Tree Data with Search
-  const loadTree = useCallback(async (search?: string) => {
-    setLoading(true);
-    try {
-      const data = await commandService.getCommandTree(search);
-      setTreeData(data);
+  const userPermissions = useAuthStore(
+    (state) => state.user?.permissions || [],
+  );
 
-      // If we are searching, auto-expand all groups that have results
-      if (search && search.length > 0) {
-        const autoExpand: Record<string, boolean> = {};
-        data.forEach((group: any) => {
-          if (group.commands && group.commands.length > 0) {
-            autoExpand[group.slug] = true;
-          }
-        });
-        setExpandedGroups(autoExpand);
-      } else if (data.length > 0 && Object.keys(expandedGroups).length === 0) {
-        // Default expand first group on initial load if nothing is expanded
-        setExpandedGroups({ [data[0].slug]: true });
-      }
-    } catch (error) {
-      console.error("Failed to load command tree", error);
-    } finally {
-      setLoading(false);
+  /**
+   * Safe matching rule engine against the static nested `PERM` definition mappings.
+   */
+  const verifyCommandAccess = (
+    categorySlug: string,
+    actionName: string,
+  ): boolean => {
+    // Blanket administrators bypass specific protocols
+    if (
+      userPermissions.includes(PERM.MANAGE_ALL_COMMANDS) ||
+      userPermissions.includes(PERM.VIEW_ALL_COMMANDS)
+    ) {
+      return true;
     }
-  }, []);
 
-  // Debounce Search Effect
+    const slug = categorySlug.toLowerCase();
+    const action = actionName.toUpperCase(); // matches object lookup attributes (e.g., "VIEW", "RUN")
+
+    if (slug.includes("ucip")) {
+      const ucipPerms = PERM.ERICSSON_UCIP as Record<string, string>;
+      return (
+        userPermissions.includes(ucipPerms[action]) ||
+        userPermissions.includes(PERM.VIEW_COMMAND_BLUEPRINTS)
+      );
+    }
+    if (slug.includes("cai")) {
+      const caiPerms = PERM.ERICSSON_CAI as Record<string, string>;
+      return (
+        userPermissions.includes(caiPerms[action]) ||
+        userPermissions.includes(PERM.VIEW_COMMAND_BLUEPRINTS)
+      );
+    }
+    if (slug.includes("smpp")) {
+      const smppPerms = PERM.SMPP as Record<string, string>;
+      return (
+        userPermissions.includes(smppPerms[action]) ||
+        userPermissions.includes(PERM.VIEW_COMMAND_BLUEPRINTS)
+      );
+    }
+
+    return false;
+  };
+
+  const loadTree = useCallback(
+    async (search?: string) => {
+      setLoading(true);
+      try {
+        const data = await commandService.getCommandTree(search);
+
+        // Perform validation check filtering across the protocol sets
+        const secureTree = data
+          .map((group: any) => {
+            const filteredCommands =
+              group.commands?.filter((cmd: any) =>
+                verifyCommandAccess(group.slug, cmd.action),
+              ) || [];
+
+            return { ...group, commands: filteredCommands };
+          })
+          .filter((group: any) => group.commands.length > 0);
+
+        setTreeData(secureTree);
+
+        if (search && search.length > 0) {
+          const autoExpand: Record<string, boolean> = {};
+          secureTree.forEach((group: any) => {
+            if (group.commands && group.commands.length > 0) {
+              autoExpand[group.slug] = true;
+            }
+          });
+          setExpandedGroups(autoExpand);
+        } else if (
+          secureTree.length > 0 &&
+          Object.keys(expandedGroups).length === 0
+        ) {
+          setExpandedGroups({ [secureTree[0].slug]: true });
+        }
+      } catch (error) {
+        console.error("Failed to load command tree", error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [userPermissions],
+  );
+
   useEffect(() => {
     const timer = setTimeout(() => {
       loadTree(searchQuery);
-    }, 300); // 300ms debounce
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [searchQuery, loadTree]);
@@ -85,7 +150,6 @@ export default function CommandTree({ onSelect }: CommandTreeProps) {
 
   return (
     <div className="flex flex-col h-full">
-      {/* SEARCH INPUT AREA */}
       <div className="p-4 border-b border-slate-200 bg-white sticky top-0 z-10">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
@@ -116,7 +180,9 @@ export default function CommandTree({ onSelect }: CommandTreeProps) {
           </div>
         ) : treeData.length === 0 ? (
           <div className="py-10 text-center">
-            <p className="text-xs text-slate-400">No commands found</p>
+            <p className="text-xs text-slate-400">
+              No authorized commands found
+            </p>
           </div>
         ) : (
           treeData.map((group) => (
@@ -148,7 +214,8 @@ export default function CommandTree({ onSelect }: CommandTreeProps) {
                         key={cmd.id}
                         onClick={() => {
                           setSelectedId(cmd.id);
-                          onSelect(cmd);
+                          // Enforce explicit mapping to pass category info along downstream
+                          onSelect({ ...cmd, category_slug: group.slug });
                         }}
                         className={cn(
                           "w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-left transition-all group/item",

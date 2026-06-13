@@ -1,3 +1,4 @@
+// /var/www/html/uap-frontend/src/pages/roles/RolesPage.tsx
 import { useEffect, useState } from "react";
 import { Trash2, ShieldCheck, Users, EyeIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -5,22 +6,20 @@ import { GenericDataTable } from "@/components/ui/GenericDataTable";
 import DeleteConfirmationModal from "@/components/management/DeleteConfirmationModal";
 import { roleAndPermissionsService } from "@/services/roleService";
 import { useToastStore } from "@/hooks/useToastStore";
+import { PERM } from "@/types/auth"; // Import global authorization permissions
 
 export default function RolesPage() {
   const navigate = useNavigate();
   const { showToast } = useToastStore();
 
-  // Data & UI States
   const [roles, setRoles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState<any>(null);
 
-  // Filter States
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Modal States
   const [deleteModal, setDeleteModal] = useState<{
     open: boolean;
     role: any | null;
@@ -32,12 +31,11 @@ export default function RolesPage() {
       const response = await roleAndPermissionsService.getAllRoles(
         page,
         limit,
-        { search: search },
+        { search },
       );
 
-      // Handle Paginated Response
       if (response && typeof response === "object" && "data" in response) {
-        setRoles(response.data); // This is the array [Role, Role, ...]
+        setRoles(response.data);
         setPagination({
           current_page: response.current_page,
           total: response.total,
@@ -46,11 +44,9 @@ export default function RolesPage() {
           last_page: response.last_page,
           per_page: response.per_page,
         });
-      }
-      // Handle Simple Array Response
-      else if (Array.isArray(response)) {
+      } else if (Array.isArray(response)) {
         setRoles(response);
-        setPagination(null); // No pagination metadata available
+        setPagination(null);
       }
     } catch (error) {
       console.error("Failed to fetch roles:", error);
@@ -102,14 +98,17 @@ export default function RolesPage() {
       label: "View Role",
       icon: <EyeIcon className="h-3.5 w-3.5" />,
       onClick: (item: any) => navigate(`/roles/${item.id}`),
+      // Require VIEW_ROLES privilege tokens to let users inspect configurations
+      permissions: [PERM.VIEW_ROLES, PERM.EDIT_ROLES],
     },
     {
       label: "Delete Role",
       variant: "danger" as const,
       icon: <Trash2 className="h-3.5 w-3.5" />,
-      // Add this hidden property
-      hidden: (item: any) => item.id === 1,
+      hidden: (item: any) => item.id === 1, // Safe fallback restriction for Master Admin role
       onClick: (item: any) => setDeleteModal({ open: true, role: item }),
+      // Require explicit DELETE_ROLES permission context rules
+      permissions: [PERM.DELETE_ROLES],
     },
   ];
 
@@ -131,6 +130,8 @@ export default function RolesPage() {
         onSearchChange={(val) => setSearchQuery(val)}
         searchPlaceholder="Search roles..."
         onAddClick={() => navigate("/roles/create")}
+        /* Guard addition privileges explicitly using the view-level definition tokens */
+        addPermission={PERM.CREATE_ROLES}
       />
 
       <DeleteConfirmationModal
@@ -148,7 +149,6 @@ export default function RolesPage() {
         onConfirm={async () => {
           if (deleteModal.role) {
             try {
-              // Assuming your service has a delete method
               await roleAndPermissionsService.deleteRole(deleteModal.role.id);
               showToast("Security role deleted successfully", "success");
               fetchRoles(currentPage, pageSize, searchQuery);
@@ -157,7 +157,7 @@ export default function RolesPage() {
                 error.response?.data?.message || "Failed to delete role",
                 "error",
               );
-              throw error; // Let modal handle error state
+              throw error;
             }
           }
         }}

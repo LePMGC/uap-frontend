@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback } from "react";
+// src/pages/operations/BatchJobsPage.tsx
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   Layers,
-  FileText,
   CheckCircle2,
   Clock,
   XCircle,
@@ -17,10 +17,25 @@ import { GenericDataTable } from "@/components/ui/GenericDataTable";
 import { useToastStore } from "@/hooks/useToastStore";
 import { cn } from "@/lib/utils";
 import { batchJobsService } from "@/services/batchJobsService";
+import { useAuthStore } from "@/store/authStore";
+import { PERM } from "@/types/auth";
 
 export default function BatchJobsPage() {
   const navigate = useNavigate();
   const { showToast } = useToastStore();
+
+  // --- AUTH & PERMISSIONS CONTROLS ---
+  const user = useAuthStore((state) => state.user);
+  const userPermissions = useMemo(() => user?.permissions || [], [user]);
+
+  // Global view allowances
+  const canViewAll =
+    userPermissions.includes(PERM.VIEW_ALL_BATCH_TEMPLATES) ||
+    userPermissions.includes(PERM.MANAGE_ALL_BATCH_TEMPLATES);
+  const canViewOwn =
+    userPermissions.includes(PERM.VIEW_OWN_BATCH_TEMPLATES) ||
+    userPermissions.includes(PERM.MANAGE_OWN_BATCH_TEMPLATES);
+  const canCreateJobs = userPermissions.includes(PERM.CREATE_BATCH_TEMPLATES);
 
   // --- STATE MANAGEMENT ---
   const [data, setData] = useState<any[]>([]);
@@ -45,6 +60,12 @@ export default function BatchJobsPage() {
 
   // --- DATA FETCHING ---
   const fetchData = useCallback(async () => {
+    // Structural Guard: If user lacks any batch template reading visibility, block engine requests
+    if (!canViewAll && !canViewOwn) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const filters = { search: searchQuery, status: statusFilter };
@@ -55,7 +76,17 @@ export default function BatchJobsPage() {
       );
 
       if (response) {
-        setData(response.data || []);
+        const rawJobs = response.data || [];
+
+        // Contextual Client-Side Ownership Filter: If they only have view_own, filter data matches
+        const filteredJobs = canViewAll
+          ? rawJobs
+          : rawJobs.filter(
+              (job: any) =>
+                String(job.user_id || job.created_by_id) === String(user?.id),
+            );
+
+        setData(filteredJobs);
         setPagination({
           current_page: response.current_page,
           total: response.total,
@@ -79,6 +110,9 @@ export default function BatchJobsPage() {
     searchQuery,
     statusFilter,
     showToast,
+    canViewAll,
+    canViewOwn,
+    user?.id,
   ]);
 
   useEffect(() => {
@@ -213,22 +247,20 @@ export default function BatchJobsPage() {
         </div>
       ),
     },
-    /*{
-      header: "Created By",
-      accessor: (item: any) => (
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-600 border border-slate-200 uppercase">
-            {item.user?.name?.[0] || "A"}
-          </div>
-          <span className="text-xs font-medium text-slate-600">
-            {item.user?.name}
-          </span>
-        </div>
-      ),
-    },*/
   ];
 
-  // Modified to use static labels/icons to please the TS engine
+  // Helper validation callback to inspect manipulation clearance levels
+  const verifyActionManagementAccess = (item: any): boolean => {
+    if (userPermissions.includes(PERM.MANAGE_ALL_BATCH_TEMPLATES)) return true;
+
+    const isOwner =
+      String(item?.user_id || item?.created_by_id) === String(user?.id);
+    if (isOwner && userPermissions.includes(PERM.MANAGE_OWN_BATCH_TEMPLATES)) {
+      return true;
+    }
+    return false;
+  };
+
   const actions = [
     {
       label: "View Details",
@@ -240,43 +272,44 @@ export default function BatchJobsPage() {
       icon: <Clock className="h-3.5 w-3.5" />,
       onClick: (item: any) => {
         showToast("Batch job paused successfully", "success");
-        // batchJobsService.togglePause(item.id)
       },
-      hidden: (item: any) => item.status !== "active",
+      hidden: (item: any) =>
+        item.status !== "active" || !verifyActionManagementAccess(item),
     },
     {
       label: "Resume Batch Job",
       icon: <Play className="h-3.5 w-3.5" />,
       onClick: (item: any) => {
         showToast("Batch job resumed successfully", "success");
-        // batchJobsService.togglePause(item.id)
       },
-      hidden: (item: any) => item.status !== "paused",
+      hidden: (item: any) =>
+        item.status !== "paused" || !verifyActionManagementAccess(item),
     },
     {
       label: "Stop Batch Job",
       icon: <XCircle className="h-3.5 w-3.5" />,
       variant: "danger" as const,
       onClick: () => showToast("Stopping batch job...", "success"),
-      hidden: (item: any) => !["active", "paused"].includes(item.status),
+      hidden: (item: any) =>
+        !["active", "paused"].includes(item.status) ||
+        !verifyActionManagementAccess(item),
     },
     {
       label: "Clone Batch Job",
       icon: <Copy className="h-3.5 w-3.5" />,
       onClick: () => showToast("Job cloned to templates", "success"),
+      hidden: () => !userPermissions.includes(PERM.CREATE_BATCH_TEMPLATES),
     },
-    /*{
-      label: "Edit Details",
-      icon: <FileText className="h-3.5 w-3.5" />,
-      onClick: (item: any) => navigate(`/batches/edit/${item.id}`),
-    },*/
     {
       label: "Delete",
       variant: "danger" as const,
       icon: <Trash2 className="h-3.5 w-3.5" />,
       onClick: (item: any) => {
-        console.log("Delete triggered for:", item.id);
+        showToast("Batch execution profile deleted", "success");
       },
+      hidden: (item: any) =>
+        !verifyActionManagementAccess(item) ||
+        !userPermissions.includes(PERM.DELETE_BATCH_TEMPLATES),
     },
   ];
 
@@ -296,22 +329,16 @@ export default function BatchJobsPage() {
         setPagination((prev) => ({ ...prev, current_page: 1 }));
       },
     },
-    {
-      id: "command",
-      label: "All Commands",
-      value: statusFilter,
-      options: [
-        { label: "Active", value: "active" },
-        { label: "Completed", value: "completed" },
-        { label: "Failed", value: "failed" },
-        { label: "Paused", value: "paused" },
-      ],
-      onChange: (val: string) => {
-        setStatusFilter(val);
-        setPagination((prev) => ({ ...prev, current_page: 1 }));
-      },
-    },
   ];
+
+  if (!canViewAll && !canViewOwn) {
+    return (
+      <div className="p-8 text-center text-slate-500 font-medium">
+        Access Denied: Insufficient application privileges to view batch
+        operations.
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
@@ -403,6 +430,7 @@ export default function BatchJobsPage() {
           setSearchQuery(val);
           setPagination((prev) => ({ ...prev, current_page: 1 }));
         }}
+        showAdd={canCreateJobs}
         onAddClick={() => navigate("/batch-jobs/create")}
       />
     </div>

@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+// src/pages/management/commands/CommandExecutionPage.tsx
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { PanelLeft, Play, ChevronRight, Loader2, Server } from "lucide-react";
 import { cn } from "@/lib/utils";
 import CommandTree from "@/components/commands_executions/CommandTree";
@@ -7,9 +8,11 @@ import ResultsPanel from "@/components/commands_executions/ResultsPanel";
 import { commandService } from "@/services/commandService";
 import { providerInstanceService } from "@/services/providerInstanceService";
 import { useToastStore } from "@/hooks/useToastStore";
+import { useAuthStore } from "@/store/authStore";
+import { PERM } from "@/types/auth";
 
 export default function CommandExecutionPage() {
-  const { showToast } = useToastStore(); // Initialize toast
+  const { showToast } = useToastStore();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [selectedCommand, setSelectedCommand] = useState<any>(null);
   const [executionData, setExecutionData] = useState({
@@ -18,7 +21,6 @@ export default function CommandExecutionPage() {
   });
   const [isExecuting, setIsExecuting] = useState(false);
 
-  // --- INSTANCE SELECTION STATE ---
   const [instances, setInstances] = useState<any[]>([]);
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | number>(
     "",
@@ -26,7 +28,51 @@ export default function CommandExecutionPage() {
   const [isLoadingInstances, setIsLoadingInstances] = useState(false);
   const [lastResult, setLastResult] = useState<any>(null);
 
-  // --- FETCH INSTANCES ---
+  const userPermissions = useAuthStore(
+    (state) => state.user?.permissions || [],
+  );
+
+  // Compute if the user can execute the currently active command selection
+  const canExecuteCurrentCommand = useMemo(() => {
+    if (!selectedCommand) return false;
+
+    // Global override guards
+    if (
+      userPermissions.includes(PERM.MANAGE_ALL_COMMANDS) ||
+      userPermissions.includes(PERM.EXECUTE_ALL_COMMANDS)
+    ) {
+      return true;
+    }
+
+    const category = selectedCommand.category_slug?.toLowerCase() || "";
+    const action = selectedCommand.action?.toUpperCase() || ""; // e.g., "RUN", "GET", "VIEW"
+
+    // Map backend data to exact PERM string configurations
+    if (category.includes("ucip")) {
+      const ucipPerms = PERM.ERICSSON_UCIP as Record<string, string>;
+      return (
+        userPermissions.includes(ucipPerms[action]) ||
+        userPermissions.includes(PERM.EXECUTE_COMMANDS)
+      );
+    }
+    if (category.includes("cai")) {
+      const caiPerms = PERM.ERICSSON_CAI as Record<string, string>;
+      return (
+        userPermissions.includes(caiPerms[action]) ||
+        userPermissions.includes(PERM.EXECUTE_COMMANDS)
+      );
+    }
+    if (category.includes("smpp")) {
+      const smppPerms = PERM.SMPP as Record<string, string>;
+      return (
+        userPermissions.includes(smppPerms[action]) ||
+        userPermissions.includes(PERM.EXECUTE_COMMANDS)
+      );
+    }
+
+    return userPermissions.includes(PERM.EXECUTE_COMMANDS);
+  }, [selectedCommand, userPermissions]);
+
   useEffect(() => {
     if (!selectedCommand?.category_slug) {
       setInstances([]);
@@ -40,14 +86,10 @@ export default function CommandExecutionPage() {
         const data = await providerInstanceService.getAllbyCategory(
           selectedCommand.category_slug,
         );
-
         setInstances(data);
 
         if (data.length > 0) {
-          // 👇 Find first active instance
           const activeInstance = data.find((inst: any) => inst.is_active);
-
-          // 👇 Use active if found, otherwise fallback to first
           setSelectedInstanceId(
             activeInstance ? activeInstance.id : data[0].id,
           );
@@ -65,13 +107,19 @@ export default function CommandExecutionPage() {
   }, [selectedCommand?.category_slug]);
 
   const handleRun = async () => {
-    // 1. Instance Check
+    if (!canExecuteCurrentCommand) {
+      showToast(
+        "Access Denied: Insufficient application privileges to execute this command structure.",
+        "error",
+      );
+      return;
+    }
+
     if (!selectedInstanceId) {
       showToast("Please select a provider instance", "error");
       return;
     }
 
-    // 2. Payload Validation Guard
     const data = executionData.data;
     const isPayloadEmpty =
       !data ||
@@ -103,8 +151,6 @@ export default function CommandExecutionPage() {
       showToast("Command executed successfully", "success");
     } catch (error: any) {
       console.error("Execution failed", error);
-
-      // Capture Backend validation messages (e.g. "The payload field is required")
       const errorData = error.response?.data;
       const errorMessage =
         errorData?.message || error.message || "Execution failed";
@@ -131,26 +177,34 @@ export default function CommandExecutionPage() {
     }
   };
 
-  // --- RESIZING LOGIC (Keep existing) ---
+  // --- RESIZING LOGIC ---
   const [resultsWidth, setResultsWidth] = useState(500);
   const isResizing = useRef(false);
-  const startResizing = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isResizing.current = true;
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", stopResizing);
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isResizing.current) return;
+    const newWidth = window.innerWidth - e.clientX;
+    if (newWidth > 250 && newWidth < window.innerWidth - 600) {
+      setResultsWidth(newWidth);
+    }
   }, []);
+
+  // 💡 Define stopResizing using a standard arrow function structure so it can clean itself up safely
   const stopResizing = useCallback(() => {
     isResizing.current = false;
     document.removeEventListener("mousemove", handleMouseMove);
     document.removeEventListener("mouseup", stopResizing);
-  }, []);
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isResizing.current) return;
-    const newWidth = window.innerWidth - e.clientX;
-    if (newWidth > 250 && newWidth < window.innerWidth - 600)
-      setResultsWidth(newWidth);
-  }, []);
+  }, [handleMouseMove]);
+
+  const startResizing = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      isResizing.current = true;
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", stopResizing);
+    },
+    [handleMouseMove, stopResizing],
+  );
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-white">
@@ -204,21 +258,24 @@ export default function CommandExecutionPage() {
             </div>
           )}
 
-          <button
-            onClick={handleRun}
-            disabled={isExecuting}
-            className={cn(
-              "flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold text-[13px] hover:bg-indigo-700 transition-all shadow-md active:scale-95 shadow-indigo-100",
-              isExecuting && "opacity-50 cursor-not-allowed",
-            )}
-          >
-            {isExecuting ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Play className="h-3.5 w-3.5 fill-current" />
-            )}
-            Run
-          </button>
+          {/* Explicit configuration check to show the interactive activation node */}
+          {selectedCommand && canExecuteCurrentCommand && (
+            <button
+              onClick={handleRun}
+              disabled={isExecuting}
+              className={cn(
+                "flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold text-[13px] hover:bg-indigo-700 transition-all shadow-md active:scale-95 shadow-indigo-100",
+                isExecuting && "opacity-50 cursor-not-allowed",
+              )}
+            >
+              {isExecuting ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Play className="h-3.5 w-3.5 fill-current" />
+              )}
+              Run
+            </button>
+          )}
         </div>
       </header>
 

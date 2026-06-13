@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils";
 import { ParameterTree } from "@/components/management/ParameterTree";
 import { parseUcipXml } from "@/utils/payloadParsers";
 import { ProtocolEditor } from "@/components/management/ProtocolEditor";
+import { useAuthStore } from "@/store/authStore";
+import { PERM } from "@/types/auth";
 
 export default function CommandFormPage() {
   const { id } = useParams();
@@ -26,8 +28,6 @@ export default function CommandFormPage() {
   const [saving, setSaving] = useState(false);
   const [activeView, setActiveView] = useState<"code" | "visual">("code");
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  // New state for category metadata (to get actions)
   const [categoryData, setCategoryData] = useState<any>(null);
 
   const [formData, setFormData] = useState<any>({
@@ -40,6 +40,40 @@ export default function CommandFormPage() {
     system_params: {},
   });
 
+  // Fetch authorization flags
+  const userPermissions = useAuthStore(
+    (state) => state.user?.permissions || [],
+  );
+  const isEdit = Boolean(id);
+
+  /**
+   * Evaluates if current credentials allow mutations on this specific category object.
+   */
+  const canModify = useMemo(() => {
+    const slug = formData.category_slug?.toLowerCase() || "";
+
+    if (slug.includes("ucip")) {
+      return isEdit
+        ? userPermissions.includes(PERM.ERICSSON_UCIP.UPDATE)
+        : userPermissions.includes(PERM.ERICSSON_UCIP.CREATE);
+    }
+    if (slug.includes("cai")) {
+      return isEdit
+        ? userPermissions.includes(PERM.ERICSSON_CAI.UPDATE)
+        : userPermissions.includes(PERM.ERICSSON_CAI.CREATE);
+    }
+    if (slug.includes("smpp")) {
+      return isEdit
+        ? userPermissions.includes(PERM.SMPP.UPDATE)
+        : userPermissions.includes(PERM.SMPP.CREATE);
+    }
+
+    return userPermissions.includes(
+      PERM.MANAGE_ALL_COMMANDS,
+      PERM.MANAGE_OWN_COMMANDS,
+    );
+  }, [formData.category_slug, userPermissions, isEdit]);
+
   const visualizedParameters = useMemo(() => {
     return parseUcipXml(formData.request_payload);
   }, [formData.request_payload]);
@@ -48,15 +82,11 @@ export default function CommandFormPage() {
     const initPage = async () => {
       try {
         setLoading(true);
-
-        // 1. Fetch Command if Editing
         if (id) {
           const data = await commandService.getOneCommand(id);
           setFormData(data);
-          // Fetch category based on loaded command
           fetchCategoryDetails(data.category_slug);
         } else {
-          // Fetch category based on URL param for new command
           const catSlug = searchParams.get("category");
           if (catSlug) fetchCategoryDetails(catSlug);
           setLoading(false);
@@ -65,7 +95,6 @@ export default function CommandFormPage() {
         showToast("Initialization failed", "error");
       }
     };
-
     initPage();
   }, [id]);
 
@@ -95,6 +124,7 @@ export default function CommandFormPage() {
   };
 
   const handleSave = async () => {
+    if (!canModify) return;
     if (!validate()) {
       showToast("Please fill in all mandatory fields", "error");
       return;
@@ -142,23 +172,27 @@ export default function CommandFormPage() {
             <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
           </button>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className={cn(
-            "bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 shadow-md transition-all",
-            saving
-              ? "opacity-50 cursor-not-allowed"
-              : "hover:bg-indigo-700 active:scale-95",
-          )}
-        >
-          {saving ? (
-            <div className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          ) : (
-            <Save className="h-3.5 w-3.5" />
-          )}
-          {saving ? "Saving..." : "Save Changes"}
-        </button>
+
+        {/* Only show the save operation button if the user has modification parameters */}
+        {canModify && (
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className={cn(
+              "bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 shadow-md transition-all",
+              saving
+                ? "opacity-50 cursor-not-allowed"
+                : "hover:bg-indigo-700 active:scale-95",
+            )}
+          >
+            {saving ? (
+              <div className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <Save className="h-3.5 w-3.5" />
+            )}
+            {saving ? "Saving..." : "Save Changes"}
+          </button>
+        )}
       </header>
 
       <main className="flex-1 flex overflow-hidden">
@@ -173,19 +207,24 @@ export default function CommandFormPage() {
               {/* Name Field */}
               <div>
                 <label className="text-[10px] font-bold text-slate-500 uppercase ml-1 flex justify-between">
-                  Command Display Name <span className="text-red-500">*</span>
+                  Command Display Name{" "}
+                  {canModify && <span className="text-red-500">*</span>}
                 </label>
                 <input
                   type="text"
+                  disabled={!canModify}
                   value={formData.name || ""}
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
                   className={cn(
-                    "w-full mt-1 px-3 py-2 bg-slate-50 border rounded-xl text-sm outline-none transition-all",
-                    errors.name
-                      ? "border-red-500"
-                      : "border-slate-200 focus:ring-2 focus:ring-indigo-500/10",
+                    "w-full mt-1 px-3 py-2 border rounded-xl text-sm outline-none transition-all",
+                    !canModify &&
+                      "bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200",
+                    canModify &&
+                      (errors.name
+                        ? "border-red-500"
+                        : "bg-slate-50 border-slate-200 focus:ring-2 focus:ring-indigo-500/10"),
                   )}
                 />
               </div>
@@ -193,19 +232,24 @@ export default function CommandFormPage() {
               {/* Protocol Key Field */}
               <div>
                 <label className="text-[10px] font-bold text-slate-500 uppercase ml-1 flex justify-between">
-                  Protocol Key <span className="text-red-500">*</span>
+                  Protocol Key{" "}
+                  {canModify && <span className="text-red-500">*</span>}
                 </label>
                 <input
                   type="text"
+                  disabled={!canModify}
                   value={formData.command_key || ""}
                   onChange={(e) =>
                     setFormData({ ...formData, command_key: e.target.value })
                   }
                   className={cn(
-                    "w-full mt-1 px-3 py-2 bg-slate-50 border rounded-xl text-sm font-mono outline-none transition-all",
-                    errors.command_key
-                      ? "border-red-500"
-                      : "border-slate-200 focus:ring-2 focus:ring-indigo-500/10",
+                    "w-full mt-1 px-3 py-2 border rounded-xl text-sm font-mono outline-none transition-all",
+                    !canModify &&
+                      "bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200",
+                    canModify &&
+                      (errors.command_key
+                        ? "border-red-500"
+                        : "bg-slate-50 border-slate-200 focus:ring-2 focus:ring-indigo-500/10"),
                   )}
                 />
               </div>
@@ -213,15 +257,22 @@ export default function CommandFormPage() {
               {/* Action Select Field */}
               <div>
                 <label className="text-[10px] font-bold text-slate-500 uppercase ml-1 flex justify-between">
-                  Command Action <span className="text-red-500">*</span>
+                  Command Action{" "}
+                  {canModify && <span className="text-red-500">*</span>}
                 </label>
                 <div className="relative mt-1">
                   <select
+                    disabled={!canModify}
                     value={formData.action || "view"}
                     onChange={(e) =>
                       setFormData({ ...formData, action: e.target.value })
                     }
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm appearance-none focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all cursor-pointer"
+                    className={cn(
+                      "w-full px-3 py-2 border rounded-xl text-sm appearance-none outline-none transition-all",
+                      !canModify
+                        ? "bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200"
+                        : "bg-slate-50 border-slate-200 focus:ring-2 focus:ring-indigo-500/10 cursor-pointer",
+                    )}
                   >
                     {categoryData?.command_actions ? (
                       categoryData.command_actions.map((act: string) => (
@@ -231,7 +282,7 @@ export default function CommandFormPage() {
                       ))
                     ) : (
                       <option value={formData.action}>
-                        {formData.action.toUpperCase()}
+                        {formData.action?.toUpperCase()}
                       </option>
                     )}
                   </select>
@@ -245,11 +296,17 @@ export default function CommandFormPage() {
                   Description
                 </label>
                 <textarea
+                  disabled={!canModify}
                   value={formData.description || ""}
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
                   }
-                  className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm min-h-[80px] outline-none"
+                  className={cn(
+                    "w-full mt-1 px-3 py-2 border rounded-xl text-sm min-h-[80px] outline-none transition-all",
+                    !canModify
+                      ? "bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200"
+                      : "bg-slate-50 border-slate-200",
+                  )}
                 />
               </div>
             </div>
@@ -320,9 +377,11 @@ export default function CommandFormPage() {
                 <ProtocolEditor
                   template={formData.request_payload || ""}
                   language={getCategoryFormat(formData.category_slug)}
-                  onChange={(val: any) =>
-                    setFormData({ ...formData, request_payload: val })
-                  }
+                  onChange={(val: any) => {
+                    if (canModify) {
+                      setFormData({ ...formData, request_payload: val });
+                    }
+                  }}
                 />
               </div>
             ) : (

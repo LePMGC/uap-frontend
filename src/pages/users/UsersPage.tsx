@@ -1,3 +1,4 @@
+// /var/www/html/uap-frontend/src/pages/users/UsersPage.tsx
 import { useState, useEffect } from "react";
 import { Edit2, Key, ShieldCheck, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -13,6 +14,7 @@ import {
   type FilterConfig,
 } from "@/components/ui/GenericDataTable";
 import DeleteConfirmationModal from "@/components/management/DeleteConfirmationModal";
+import { PERM } from "@/types/auth"; // Import global permission object
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -150,27 +152,32 @@ export default function UsersPage() {
     setIsDeleteModalOpen(true);
   };
 
+  // Assign corresponding tokens to action item items array
   const actions = [
     {
       label: "Edit User",
       icon: <Edit2 className="h-3.5 w-3.5" />,
       onClick: handleEdit,
+      permissions: [PERM.EDIT_USERS],
     },
     {
       label: (user: User) => (user.is_blocked ? "Unblock User" : "Block User"),
       icon: <ShieldCheck className="h-3.5 w-3.5" />,
       onClick: handleToggleBlock,
+      permissions: [PERM.EDIT_USERS],
     },
     {
       label: "Reset Password",
       icon: <Key className="h-3.5 w-3.5" />,
       onClick: handleResetPassword,
+      permissions: [PERM.RESET_USER_PASSWORDS],
     },
     {
       label: "Delete Account",
       icon: <Trash2 className="h-3.5 w-3.5" />,
       variant: "danger" as const,
       onClick: handleDelete,
+      permissions: [PERM.DELETE_USERS],
     },
   ];
 
@@ -262,6 +269,8 @@ export default function UsersPage() {
           setModalMode("create");
           setIsModalOpen(true);
         }}
+        /* Pass create users token string to enforce top right CTA safety checks */
+        addPermission={PERM.CREATE_USERS}
       />
 
       <UserFormModal
@@ -300,7 +309,6 @@ export default function UsersPage() {
                 error.response?.data?.message || "Failed to delete user",
                 "error",
               );
-              // Throw the error so the modal's loading state can stop
               throw error;
             }
           }

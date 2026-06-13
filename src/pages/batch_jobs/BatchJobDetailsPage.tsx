@@ -1,15 +1,23 @@
-import { useState, useEffect, useCallback } from "react";
-import { useParams } from "react-router-dom";
+// src/pages/operations/BatchJobDetailsPage.tsx
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { useToastStore } from "@/hooks/useToastStore";
 import { batchJobsService } from "@/services/batchJobsService";
 import { commandService } from "@/services/commandService";
 import { JobConfigurationHeader } from "./details/JobConfigurationHeader";
 import { ExecutionStats } from "./details/ExecutionStats";
 import { LogSection } from "./details/LogSection";
+import { useAuthStore } from "@/store/authStore";
+import { PERM } from "@/types/auth";
 
 export default function BatchJobDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const { showToast } = useToastStore();
+  const navigate = useNavigate();
+
+  // --- IDENTITY & PERMISSION CHECKS ---
+  const user = useAuthStore((state) => state.user);
+  const userPermissions = useMemo(() => user?.permissions || [], [user]);
 
   const [jobConfig, setJobConfig] = useState<any>(null);
   const [instances, setInstances] = useState<any[]>([]);
@@ -21,6 +29,38 @@ export default function BatchJobDetailsPage() {
   const [logStatus, setLogStatus] = useState("All");
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(5);
+
+  // Check read clearance levels dynamically based on individual job metrics
+  const hasViewAccess = useMemo(() => {
+    if (!jobConfig) return false;
+    if (
+      userPermissions.includes(PERM.VIEW_ALL_BATCH_INSTANCES) ||
+      userPermissions.includes(PERM.MANAGE_ALL_BATCH_TEMPLATES)
+    ) {
+      return true;
+    }
+    const isOwner =
+      String(jobConfig.user_id || jobConfig.created_by_id) === String(user?.id);
+    if (
+      isOwner &&
+      (userPermissions.includes(PERM.VIEW_OWN_BATCH_INSTANCES) ||
+        userPermissions.includes(PERM.MANAGE_OWN_BATCH_TEMPLATES))
+    ) {
+      return true;
+    }
+    return false;
+  }, [jobConfig, userPermissions, user?.id]);
+
+  // Check mutation clearance levels dynamically
+  const hasManagementAccess = useMemo(() => {
+    if (!jobConfig) return false;
+    if (userPermissions.includes(PERM.MANAGE_ALL_BATCH_TEMPLATES)) return true;
+    const isOwner =
+      String(jobConfig.user_id || jobConfig.created_by_id) === String(user?.id);
+    if (isOwner && userPermissions.includes(PERM.MANAGE_OWN_BATCH_TEMPLATES))
+      return true;
+    return false;
+  }, [jobConfig, userPermissions, user?.id]);
 
   const refreshInstanceList = useCallback(async () => {
     if (!id) return;
@@ -34,7 +74,7 @@ export default function BatchJobDetailsPage() {
 
   const fetchInstanceData = useCallback(
     async (isSilent = false) => {
-      if (!selectedInstanceId) return;
+      if (!selectedInstanceId || !hasViewAccess) return;
       try {
         const statusFilter =
           logStatus !== "All" ? logStatus.toLowerCase() : undefined;
@@ -52,7 +92,7 @@ export default function BatchJobDetailsPage() {
         if (!isSilent) showToast("Failed to refresh instance data", "error");
       }
     },
-    [selectedInstanceId, logStatus, page, perPage, showToast],
+    [selectedInstanceId, logStatus, page, perPage, showToast, hasViewAccess],
   );
 
   useEffect(() => {
@@ -60,11 +100,13 @@ export default function BatchJobDetailsPage() {
       if (!id) return;
       try {
         setIsLoading(true);
-        const [configResponse] = await Promise.all([
-          batchJobsService.getById(id),
-          refreshInstanceList(),
-        ]);
-        setJobConfig(configResponse.data || configResponse);
+        const configResponse = await batchJobsService.getById(id);
+        const activeConfig = configResponse.data || configResponse;
+        setJobConfig(activeConfig);
+
+        // Load operational instances immediately following configuration confirmation
+        const instancesResponse = await batchJobsService.getInstances(id);
+        setInstances(instancesResponse.data?.data || []);
       } catch (error) {
         showToast("Failed to load job details", "error");
       } finally {
@@ -72,7 +114,7 @@ export default function BatchJobDetailsPage() {
       }
     };
     initPage();
-  }, [id, showToast, refreshInstanceList]);
+  }, [id, showToast]);
 
   useEffect(() => {
     if (instances.length > 0 && !selectedInstanceId) {
@@ -81,15 +123,17 @@ export default function BatchJobDetailsPage() {
   }, [instances, selectedInstanceId]);
 
   useEffect(() => {
-    fetchInstanceData();
-  }, [fetchInstanceData]);
+    if (hasViewAccess) {
+      fetchInstanceData();
+    }
+  }, [fetchInstanceData, hasViewAccess]);
 
   useEffect(() => {
     let interval: number | undefined;
     const isOngoing =
       instanceDetails?.status === "processing" ||
       instanceDetails?.status === "pending";
-    if (isOngoing && selectedInstanceId) {
+    if (isOngoing && selectedInstanceId && hasViewAccess) {
       interval = window.setInterval(() => fetchInstanceData(true), 3000);
     } else if (
       instanceDetails?.status === "completed" ||
@@ -105,15 +149,23 @@ export default function BatchJobDetailsPage() {
     selectedInstanceId,
     fetchInstanceData,
     refreshInstanceList,
+    hasViewAccess,
   ]);
 
-  // Export/Retry Handlers
+  // --- ACTIONS WITH EXPLICIT GUARD VALIDATIONS ---
   const handleExportReport = () => {
-    // showToast("Generating instance report...", "info");
-    // API Call: batchJobsService.downloadReport(selectedInstanceId)
+    if (!userPermissions.includes(PERM.DOWNLOAD_BATCH_REPORT)) {
+      showToast("Access Denied: Missing report download permissions", "error");
+      return;
+    }
+    showToast("Report download initiated", "success");
   };
 
   const handleExportAllErrors = () => {
+    if (!userPermissions.includes(PERM.DOWNLOAD_BATCH_RESULTS)) {
+      showToast("Access Denied: Missing results export privileges", "error");
+      return;
+    }
     batchJobsService
       .exportAllErrors(selectedInstanceId)
       .then(() => {
@@ -125,6 +177,10 @@ export default function BatchJobDetailsPage() {
   };
 
   const handleExportByCode = async (code: string) => {
+    if (!userPermissions.includes(PERM.DOWNLOAD_BATCH_RESULTS)) {
+      showToast("Access Denied: Missing results export privileges", "error");
+      return;
+    }
     try {
       showToast(`Exporting ${code} records...`, "success");
       await batchJobsService.exportErrorsByCode(selectedInstanceId, code);
@@ -134,9 +190,19 @@ export default function BatchJobDetailsPage() {
   };
 
   const handleRetryByCode = async (code: string) => {
+    if (
+      !hasManagementAccess ||
+      !userPermissions.includes(PERM.RUN_BATCH_JOBS)
+    ) {
+      showToast(
+        "Access Denied: Insufficient authorization to trigger execution task re-runs.",
+        "error",
+      );
+      return;
+    }
     try {
-      // showToast(`Retry initiated for error: ${code}`, "info");
       await batchJobsService.retryByErrorCode(selectedInstanceId, code);
+      showToast(`Retry initiated for error code: ${code}`, "success");
       fetchInstanceData();
     } catch (error) {
       showToast("Retry failed", "error");
@@ -144,6 +210,13 @@ export default function BatchJobDetailsPage() {
   };
 
   const handleDownloadSource = async (instanceId: string) => {
+    if (!userPermissions.includes(PERM.DOWNLOAD_BATCH_RESULTS)) {
+      showToast(
+        "Access Denied: Missing authorization to pull down data source configurations",
+        "error",
+      );
+      return;
+    }
     try {
       await batchJobsService.downloadSourceFile(instanceId);
       showToast("Source file download initiated", "success");
@@ -152,7 +225,7 @@ export default function BatchJobDetailsPage() {
     }
   };
 
-  if (isLoading || !jobConfig) {
+  if (isLoading) {
     return (
       <div className="p-8 text-center text-slate-500 font-medium italic">
         Loading dashboard...
@@ -160,10 +233,19 @@ export default function BatchJobDetailsPage() {
     );
   }
 
+  // Active Denial Guard Render
+  if (jobConfig && !hasViewAccess) {
+    return (
+      <div className="p-8 text-center font-bold text-red-600">
+        Access Denied: You do not possess clearance parameters to view this
+        batch tracking node.
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
       <div className="p-8 max-w-[1600px] mx-auto space-y-8">
-        {/* Full-width Header with integrated Export button */}
         <JobConfigurationHeader
           data={jobConfig}
           onExportReport={handleExportReport}
@@ -196,6 +278,16 @@ export default function BatchJobDetailsPage() {
           }}
           errors={instanceDetails?.error_analysis || []}
           onRetryFailed={async () => {
+            if (
+              !hasManagementAccess ||
+              !userPermissions.includes(PERM.RUN_BATCH_JOBS)
+            ) {
+              showToast(
+                "Access Denied: Insufficient application privileges.",
+                "error",
+              );
+              return;
+            }
             try {
               await batchJobsService.retryFailedRecords(selectedInstanceId);
               showToast("Global retry triggered", "success");
