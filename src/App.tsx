@@ -8,8 +8,8 @@ import UsersPage from "./pages/users/UsersPage";
 import { GlobalToast } from "./components/ui/GlobalToast";
 import RolesPage from "./pages/roles/RolesPage";
 import RoleFormPage from "./pages/roles/RoleFormPage";
-import DataSourcesPage from "./pages/data_sources/DataSourcesPage";
-import DataSourceFormPage from "./pages/data_sources/DataSourceFormPage";
+import DataSourcesPage from "./components/data_sources/DataSourcesPage";
+import DataSourceFormPage from "./components/data_sources/DataSourceFormPage";
 import ProviderInstancesPage from "./pages/provider_instances/ProviderInstancesPage";
 import ProviderInstanceFormPage from "./pages/provider_instances/ProviderInstanceFormPage";
 import AuditLogsPage from "./pages/audit/AuditLogsPage";
@@ -21,6 +21,8 @@ import BatchJobsPage from "./pages/batch_jobs/BatchJobsPage";
 import CreateBatchJobPage from "./pages/batch_jobs/wizard";
 import BatchJobDetailsPage from "./pages/batch_jobs/BatchJobDetailsPage";
 import LeapJourneyPage from "./pages/leap_logs";
+import ReimbursementsPage from "./pages/reimbursements/ReimbursementsPage";
+import CreateReimbursementPage from "./pages/reimbursements/CreateReimbursementPage";
 
 export default function App() {
   const { isAuthenticated, needsPasswordChange } = useAuthStore();
@@ -101,6 +103,13 @@ export default function App() {
           <Route path="/batch-jobs/:id" element={<BatchJobDetailsPage />} />
 
           <Route path="/logs" element={<LeapJourneyPage />} />
+
+          <Route path="/reimbursements" element={<ReimbursementsPage />} />
+
+          <Route
+            path="/reimbursements/create"
+            element={<CreateReimbursementPage />}
+          />
 
           {/* 2. Catch-all for the protected area (the very last item in this block) */}
           <Route index element={<Navigate to="/dashboard" replace />} />

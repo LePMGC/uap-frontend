@@ -129,8 +129,9 @@ export default function RolesPage() {
         }}
         onSearchChange={(val) => setSearchQuery(val)}
         searchPlaceholder="Search roles..."
+        // ✅ FIX: prevent search from consuming full header width
+        searchWidth="w-full md:w-64"
         onAddClick={() => navigate("/roles/create")}
-        /* Guard addition privileges explicitly using the view-level definition tokens */
         addPermission={PERM.CREATE_ROLES}
       />
 

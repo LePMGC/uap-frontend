@@ -30,37 +30,23 @@ export default function BatchJobDetailsPage() {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(5);
 
-  // Check read clearance levels dynamically based on individual job metrics
+  // Read view clearance is derived directly from base permissions now.
+  // We trust the backend dataset constraint limits for context handling.
   const hasViewAccess = useMemo(() => {
-    if (!jobConfig) return false;
-    if (
+    return (
       userPermissions.includes(PERM.VIEW_ALL_BATCH_INSTANCES) ||
+      userPermissions.includes(PERM.VIEW_OWN_BATCH_INSTANCES) ||
       userPermissions.includes(PERM.MANAGE_ALL_BATCH_TEMPLATES)
-    ) {
-      return true;
-    }
-    const isOwner =
-      String(jobConfig.user_id || jobConfig.created_by_id) === String(user?.id);
-    if (
-      isOwner &&
-      (userPermissions.includes(PERM.VIEW_OWN_BATCH_INSTANCES) ||
-        userPermissions.includes(PERM.MANAGE_OWN_BATCH_TEMPLATES))
-    ) {
-      return true;
-    }
-    return false;
-  }, [jobConfig, userPermissions, user?.id]);
+    );
+  }, [userPermissions]);
 
-  // Check mutation clearance levels dynamically
+  // Management permission tracking is handled cleanly for trigger/mutation buttons
   const hasManagementAccess = useMemo(() => {
-    if (!jobConfig) return false;
-    if (userPermissions.includes(PERM.MANAGE_ALL_BATCH_TEMPLATES)) return true;
-    const isOwner =
-      String(jobConfig.user_id || jobConfig.created_by_id) === String(user?.id);
-    if (isOwner && userPermissions.includes(PERM.MANAGE_OWN_BATCH_TEMPLATES))
-      return true;
-    return false;
-  }, [jobConfig, userPermissions, user?.id]);
+    return (
+      userPermissions.includes(PERM.MANAGE_ALL_BATCH_TEMPLATES) ||
+      userPermissions.includes(PERM.MANAGE_OWN_BATCH_TEMPLATES)
+    );
+  }, [userPermissions]);
 
   const refreshInstanceList = useCallback(async () => {
     if (!id) return;
@@ -233,8 +219,8 @@ export default function BatchJobDetailsPage() {
     );
   }
 
-  // Active Denial Guard Render
-  if (jobConfig && !hasViewAccess) {
+  // Active Denial Guard Render based completely on structural read privileges
+  if (!hasViewAccess) {
     return (
       <div className="p-8 text-center font-bold text-red-600">
         Access Denied: You do not possess clearance parameters to view this

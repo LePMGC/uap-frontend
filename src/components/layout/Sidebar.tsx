@@ -13,6 +13,8 @@ import {
   LogOut,
   ChevronRight,
   ListFilter,
+  Redo,
+  ReceiptEuro,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { cn } from "@/lib/utils";
@@ -42,6 +44,12 @@ const menuGroups = [
         icon: LayoutDashboard,
         url: "/dashboard",
         requiredPermission: PERM.VIEW_INSTANCES,
+      },
+      {
+        name: "Reimbursements",
+        icon: ReceiptEuro,
+        url: "/reimbursements",
+        requiredPermission: PERM.EXECUTE_COMMANDS,
       },
       {
         name: "Single Execution",

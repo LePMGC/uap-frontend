@@ -14,10 +14,16 @@ import { createPortal } from "react-dom";
 import { useAuthStore } from "@/store/authStore"; // Import auth state manager
 
 export interface FilterConfig {
-  label: string;
-  value: string;
-  options: { label: string; value: string }[];
-  onChange: (value: string) => void;
+  id?: string;
+
+  // Existing dropdown props
+  label?: string;
+  value?: string;
+  options?: { label: string; value: string }[];
+  onChange?: (value: string) => void;
+
+  // New optional custom filter
+  custom?: React.ReactNode;
 }
 
 export interface Column<T> {
@@ -65,6 +71,8 @@ interface GenericDataTableProps<T> {
   showAdd?: boolean;
   showExport?: boolean;
   titleSize?: string;
+  filterContent?: React.ReactNode;
+  searchWidth?: string;
 }
 
 export function GenericDataTable<T>({
@@ -86,6 +94,8 @@ export function GenericDataTable<T>({
   showAdd = true,
   showExport = true,
   titleSize = "text-xl",
+  searchWidth = "w-full",
+  filterContent,
 }: GenericDataTableProps<T>) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -140,9 +150,11 @@ export function GenericDataTable<T>({
       )}
 
       {/* ROW 2: CONTROLS */}
-      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-4 bg-white">
-        <div className="flex flex-1 items-center gap-2 max-w-3xl">
-          <div className="relative w-full max-w-xs">
+      <div className="px-4 py-3 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white">
+        {/* Left Control Column: Search Bar & Select Filters Panel */}
+        <div className="flex flex-1 flex-col lg:flex-row lg:items-center gap-3 w-full">
+          {/* Search Field */}
+          <div className={cn("relative shrink-0", searchWidth)}>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
             <input
               type="text"
@@ -152,32 +164,42 @@ export function GenericDataTable<T>({
             />
           </div>
 
-          <div className="flex items-center gap-2">
-            {filters.map((filter, index) => (
-              <div key={index} className="relative">
-                <select
-                  value={filter.value}
-                  onChange={(e) => filter.onChange(e.target.value)}
-                  className="bg-white border border-slate-200 rounded-lg pl-3 pr-8 py-1.5 text-[11px] font-bold text-slate-600 outline-none hover:border-slate-300 transition-colors appearance-none cursor-pointer"
-                >
-                  <option value="">{filter.label}</option>
-                  {filter.options.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400 pointer-events-none" />
-              </div>
-            ))}
+          {/* Filters wrapping neatly into 1-2 lines */}
+          <div className="flex flex-wrap items-center gap-2 w-full">
+            {filters.map((filter, index) => {
+              if (filter.custom) {
+                return <div key={filter.id ?? index}>{filter.custom}</div>;
+              }
+
+              return (
+                <div key={filter.id ?? index} className="relative shrink-0">
+                  <select
+                    value={filter.value ?? ""}
+                    onChange={(e) => filter.onChange?.(e.target.value)}
+                    className="bg-white border border-slate-200 rounded-lg pl-3 pr-8 py-1.5 text-[11px] font-bold text-slate-600 outline-none hover:border-slate-300 transition-colors appearance-none cursor-pointer h-9"
+                  >
+                    <option value="">{filter.label}</option>
+                    {filter.options?.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400 pointer-events-none" />
+                </div>
+              );
+            })}
+
+            {filterContent}
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Right Action Column: CTA Buttons */}
+        <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
           {showExport && onExportClick && (
             <button
               onClick={onExportClick}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 rounded-lg font-bold text-[11px] hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 rounded-lg font-bold text-[11px] hover:bg-slate-50 transition-all active:scale-95 shadow-sm h-9"
             >
               <Download className="h-3.5 w-3.5" />
               Export
@@ -187,7 +209,7 @@ export function GenericDataTable<T>({
           {isAdditionVisible && (
             <button
               onClick={onAddClick}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg font-bold text-[11px] hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 active:scale-95"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg font-bold text-[11px] hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 active:scale-95 h-9"
             >
               <Plus className="h-3.5 w-3.5" />
               Add New

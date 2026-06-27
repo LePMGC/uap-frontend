@@ -1,3 +1,5 @@
+import { manual } from "prismjs";
+
 export type UserRole = string; // Backend-driven role names
 
 export const PERM = {
@@ -44,6 +46,16 @@ export const PERM = {
   EDIT_DATASOURCES: "edit_datasources",
   DELETE_DATASOURCES: "delete_datasources",
   TEST_DATASOURCES: "test_datasources",
+
+  // Reimbursements Management
+  APPROVE_TIER3_REIMBURSEMENTS: "approve_tier3_reimbursements",
+  APPROVE_TIER2_REIMBURSEMENTS: "approve_tier2_reimbursements",
+  APPROVE_TIER1_REIMBURSEMENTS: "approve_tier1_reimbursements",
+  CREATE_SINGLE_REIMBURSEMENTS: "create_single_reimbursement",
+  CREATE_BULK_REIMBURSEMENTS: "create_bulk_reimbursements",
+  VIEW_ALL_REIMBURSEMENTS: "view_all_reimbursements",
+  VIEW_OWN_REIMBURSEMENTS: "view_own_reimbursements",
+  MANAGE_REIMBURSEMENT_SETTINGS: "manage_reimbursement_settings",
 
   // Single Command Execution & Logs
   EXECUTE_COMMANDS: "execute_commands",

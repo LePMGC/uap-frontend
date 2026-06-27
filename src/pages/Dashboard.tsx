@@ -2,7 +2,6 @@ import { StatsCards } from "@/components/dashboard/StatsCards";
 import { ProviderHealthList } from "@/components/dashboard/ProviderHealthList";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { PlatformHealth } from "@/components/dashboard/PlatformHealth";
-import { QuickActions } from "@/components/dashboard/QuickActions";
 import { useState, useEffect } from "react";
 
 export default function Dashboard() {

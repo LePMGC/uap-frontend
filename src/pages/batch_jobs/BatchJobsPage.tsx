@@ -28,13 +28,11 @@ export default function BatchJobsPage() {
   const user = useAuthStore((state) => state.user);
   const userPermissions = useMemo(() => user?.permissions || [], [user]);
 
-  // Global view allowances
-  const canViewAll =
-    userPermissions.includes(PERM.VIEW_ALL_BATCH_TEMPLATES) ||
-    userPermissions.includes(PERM.MANAGE_ALL_BATCH_TEMPLATES);
-  const canViewOwn =
-    userPermissions.includes(PERM.VIEW_OWN_BATCH_TEMPLATES) ||
-    userPermissions.includes(PERM.MANAGE_OWN_BATCH_TEMPLATES);
+  // Read allowances are used only for page-level access guards
+  const canViewAll = userPermissions.includes(PERM.VIEW_ALL_BATCH_TEMPLATES);
+  const canViewOwn = userPermissions.includes(PERM.VIEW_OWN_BATCH_TEMPLATES);
+
+  // Gating controls for management visibility
   const canCreateJobs = userPermissions.includes(PERM.CREATE_BATCH_TEMPLATES);
 
   // --- STATE MANAGEMENT ---
@@ -76,17 +74,8 @@ export default function BatchJobsPage() {
       );
 
       if (response) {
-        const rawJobs = response.data || [];
-
-        // Contextual Client-Side Ownership Filter: If they only have view_own, filter data matches
-        const filteredJobs = canViewAll
-          ? rawJobs
-          : rawJobs.filter(
-              (job: any) =>
-                String(job.user_id || job.created_by_id) === String(user?.id),
-            );
-
-        setData(filteredJobs);
+        // Direct Assignment: trust the scoped dataset supplied by the backend gateway
+        setData(response.data || []);
         setPagination({
           current_page: response.current_page,
           total: response.total,
@@ -112,7 +101,6 @@ export default function BatchJobsPage() {
     showToast,
     canViewAll,
     canViewOwn,
-    user?.id,
   ]);
 
   useEffect(() => {
@@ -249,7 +237,7 @@ export default function BatchJobsPage() {
     },
   ];
 
-  // Helper validation callback to inspect manipulation clearance levels
+  // Action mutations can continue using contextual checks for extra click protection
   const verifyActionManagementAccess = (item: any): boolean => {
     if (userPermissions.includes(PERM.MANAGE_ALL_BATCH_TEMPLATES)) return true;
 
@@ -342,7 +330,7 @@ export default function BatchJobsPage() {
 
   return (
     <div className="p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
-      {/* 🟢 TOP STATS CARDS */}
+      {/* TOP STATS CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
         {[
           {
@@ -406,7 +394,7 @@ export default function BatchJobsPage() {
         ))}
       </div>
 
-      {/* 🟢 MAIN TABLE */}
+      {/* MAIN TABLE */}
       <GenericDataTable
         title="Batch Operations"
         subtitle="Manage large-scale executions and automated command templates."

@@ -186,7 +186,7 @@ export function CommandGrid({
         columns={columns}
         actions={actions}
         pagination={pagination}
-        filters={filterConfigs}
+        filters={filterConfigs} // keep if still supported
         onPageChange={(page) => setCurrentPage(page)}
         onPageSizeChange={(newSize) => {
           setPageSize(newSize);
@@ -197,10 +197,11 @@ export function CommandGrid({
           setCurrentPage(1);
         }}
         searchPlaceholder="Search by command name or key..."
+        searchWidth="w-full md:w-64"
         showAdd={true}
         showExport={true}
         onAddClick={() => {
-          navigate(`/commands-defintions/create?category=${categorySlug}`);
+          navigate(`/commands-definitions/create?category=${categorySlug}`);
         }}
         onExportClick={() => {
           console.log("Exporting", categorySlug, "commands...");

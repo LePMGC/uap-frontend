@@ -186,7 +186,7 @@ export default function ProviderInstancesPage() {
         columns={columns}
         actions={actions}
         pagination={pagination}
-        filters={filterConfigs}
+        searchWidth="w-full md:w-64"
         onPageChange={setCurrentPage}
         onPageSizeChange={(size) => {
           setPageSize(size);
@@ -196,7 +196,40 @@ export default function ProviderInstancesPage() {
           setSearchQuery(val);
           setCurrentPage(1);
         }}
+        searchPlaceholder="Search provider instances..."
         onAddClick={() => navigate("/providers-instances/create")}
+        filterContent={
+          <div className="flex flex-wrap items-center gap-2">
+            {/* CATEGORY FILTER */}
+            <select
+              value={categoryFilter}
+              onChange={(e) => {
+                setCategoryFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="h-9 bg-white border border-slate-200 rounded-lg px-3 text-[11px] font-bold text-slate-600"
+            >
+              <option value="">All Categories</option>
+              <option value="ericsson-ucip">Ericsson UCIP</option>
+              <option value="ericsson-cai">Ericsson CAI</option>
+              <option value="leap">LEAP REST</option>
+              <option value="smsc">SMSC</option>
+            </select>
+
+            {/* CLEAR BUTTON */}
+            {categoryFilter && (
+              <button
+                onClick={() => {
+                  setCategoryFilter("");
+                  setCurrentPage(1);
+                }}
+                className="h-9 px-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-[11px] font-bold hover:bg-red-100"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        }
       />
 
       <DeleteConfirmationModal

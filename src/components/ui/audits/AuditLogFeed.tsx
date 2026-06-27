@@ -59,6 +59,7 @@ export function AuditLogFeed() {
     },
     {
       header: "User",
+
       accessor: (item: any) => (
         <span className="text-xs font-medium text-slate-600">{item.user}</span>
       ),
@@ -107,6 +108,8 @@ export function AuditLogFeed() {
         }
         showAdd={false}
         showExport={false}
+        // ✅ FIX: align with all other pages
+        searchWidth="w-full md:w-64"
       />
 
       <TraceTimelineDrawer

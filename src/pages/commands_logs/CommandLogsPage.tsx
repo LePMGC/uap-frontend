@@ -70,6 +70,7 @@ export default function CommandLogsPage() {
     fetchLogs();
   }, [currentPage, pageSize, searchQuery, statusFilter]);
 
+  // --- DATA TABLE COLUMN PROPS CONFIG ---
   const columns: Column<any>[] = [
     {
       header: "Command & Instance",
@@ -100,7 +101,6 @@ export default function CommandLogsPage() {
       header: "Target (MSISDN)",
       accessor: (item: any) => (
         <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded">
-          {/* Protected with optional chaining fallback for variable payload inputs */}
           #{" "}
           {item?.payloads?.request?.data?.subscriberNumber ?? "Raw / No MSISDN"}
         </span>
@@ -122,7 +122,6 @@ export default function CommandLogsPage() {
             {item?.result?.is_successful ? "SUCCESS" : "FAILED"}
           </span>
           <span className="text-[9px] font-bold text-slate-400">
-            {/* 💡 Crucial Fix: Safe null evaluation for execution payload exceptions */}
             Code: {item?.payloads?.response?.code ?? "N/A"}
           </span>
         </div>
@@ -190,6 +189,23 @@ export default function CommandLogsPage() {
     },
   ];
 
+  // --- STRUCTURED ROW FILTER CONFIGS ---
+  const filterConfigs = [
+    {
+      id: "status",
+      label: "All Statuses",
+      value: statusFilter,
+      options: [
+        { label: "Success logs", value: "success" },
+        { label: "Failure logs", value: "failed" },
+      ],
+      onChange: (val: string) => {
+        setStatusFilter(val);
+        setCurrentPage(1);
+      },
+    },
+  ];
+
   return (
     <div className="p-8 max-w-[1600px] mx-auto animate-in fade-in duration-500">
       <GenericDataTable
@@ -200,8 +216,10 @@ export default function CommandLogsPage() {
         columns={columns}
         actions={actions}
         pagination={pagination}
+        filters={filterConfigs}
         showAdd={false}
         searchPlaceholder="Search logs..."
+        searchWidth="w-full md:w-64 md:shrink-0" // Aligns the search input neatly without crowding other options
         onPageChange={setCurrentPage}
         onPageSizeChange={(size) => {
           setPageSize(size);

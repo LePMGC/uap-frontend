@@ -58,6 +58,8 @@ export function ConnectivityStats() {
       columns={columns}
       showAdd={false}
       showExport={false}
+      // ✅ FIX: prevent full-width search takeover in header layout
+      searchWidth="w-full md:w-64"
     />
   );
 }

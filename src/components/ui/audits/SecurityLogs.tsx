@@ -53,6 +53,8 @@ export function SecurityLogs() {
       columns={columns}
       showAdd={false}
       showExport={false}
+      // ✅ FIX: prevent full-width search takeover
+      searchWidth="w-full md:w-64"
     />
   );
 }

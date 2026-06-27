@@ -265,11 +265,12 @@ export default function UsersPage() {
         onSearchChange={(val) => handleFilterChange(setSearchQuery, val)}
         filters={userFilters}
         searchPlaceholder="Search by name or email..."
+        // ✅ ADD THIS (fix layout collapse)
+        searchWidth="w-full md:w-64"
         onAddClick={() => {
           setModalMode("create");
           setIsModalOpen(true);
         }}
-        /* Pass create users token string to enforce top right CTA safety checks */
         addPermission={PERM.CREATE_USERS}
       />
 
