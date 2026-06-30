@@ -39,9 +39,12 @@ export interface ReimbursementItem {
   rejection_reason?: string;
   attachments: ReimbursementAttachment[];
   requested_by_user_id: string | number;
-  approved_by_user_id?: string | number;
+  approved_by_user_id?: string | number | null;
   created_at: string;
-  updated_at: string;
+
+  // ADD THESE TWO LINES TO FIX THE COMPILATION COMPLAINT:
+  requester_name?: string | null;
+  approver_name?: string | null;
 }
 
 export interface ReimbursementStats {
@@ -71,7 +74,7 @@ export interface ReimbursementCreationPayload {
   attachment_ids?: (string | number)[]; // Pre-uploaded attachment array IDs from UAP file storage layer
 }
 
-// --- NEW INTERFACES FOR FILE ANALYSIS ENGINE ---
+// --- FILE ANALYSIS ENGINE INTERFACES ---
 
 export interface FileValidationErrorItem {
   row: number;
@@ -88,6 +91,7 @@ export interface FileValidationResult {
     invalid: number;
   };
   errors: FileValidationErrorItem[];
+  message?: string;
 }
 
 export interface UploadedAttachmentResult {
@@ -123,14 +127,14 @@ export const reimbursementsService = {
   },
 
   /**
-   * Fetch aggregate micro-visibility counter metrics for the top dashboard cards
+   * Fetch high level execution summary and KPI data counters
    */
   getStats: async (): Promise<{
     success: boolean;
     data: ReimbursementStats;
   }> => {
     try {
-      const response = await api.get("/operations/reimbursements/stats");
+      const response = await api.get(`/operations/reimbursements/stats`);
       return response.data;
     } catch (error) {
       console.error("reimbursementsService.getStats failed:", error);
@@ -139,31 +143,13 @@ export const reimbursementsService = {
   },
 
   /**
-   * Fetch detailed metadata context for a specific reimbursement entry
-   */
-  getReimbursementById: async (
-    id: number | string,
-  ): Promise<ReimbursementItem> => {
-    try {
-      const response = await api.get(`/operations/reimbursements/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error(
-        `reimbursementsService.getReimbursementById failed for ID ${id}:`,
-        error,
-      );
-      throw error;
-    }
-  },
-
-  /**
-   * Initialize and submit a single or batch reimbursement request into the approval stream
+   * Post adjustment parameters context down to central checker queues
    */
   createReimbursement: async (
     payload: ReimbursementCreationPayload,
   ): Promise<ReimbursementItem> => {
     try {
-      const response = await api.post("/operations/reimbursements", payload);
+      const response = await api.post(`/operations/reimbursements`, payload);
       return response.data;
     } catch (error) {
       console.error("reimbursementsService.createReimbursement failed:", error);
@@ -172,8 +158,7 @@ export const reimbursementsService = {
   },
 
   /**
-   * Authorize a pending request (Checker action).
-   * Note: Triggers automated programmatic payload dispatch directly to LEAP if reimbursement_mode is 'AUTO'.
+   * Approve a pending validation transaction. Moves context logic into automatic dispatch layers.
    */
   approve: async (id: number | string): Promise<ReimbursementItem> => {
     try {
@@ -213,37 +198,17 @@ export const reimbursementsService = {
   },
 
   /**
-   * Explicitly append operational evidence attachments or receipts during manual resolution steps.
-   */
-  addAttachment: async (
-    id: number | string,
-    attachmentIds: (string | number)[],
-  ): Promise<ReimbursementItem> => {
-    try {
-      const response = await api.post(
-        `/operations/reimbursements/${id}/attachments`,
-        {
-          attachment_ids: attachmentIds,
-        },
-      );
-      return response.data;
-    } catch (error) {
-      console.error(
-        `reimbursementsService.addAttachment failed for ID ${id}:`,
-        error,
-      );
-      throw error;
-    }
-  },
-
-  /**
-   * Transmit raw spreadsheet matrix byte-stream chunks directly to the back-end parsing engine.
+   * Stream raw byte-stream chunks directly to the back-end parsing engine.
    * This executes structural formatting matches and database product eligibility calculations.
    */
-  validateSourceSheet: async (file: File): Promise<FileValidationResult> => {
+  validateInboundSheet: async (
+    file: File,
+    distributionMode: string,
+  ): Promise<FileValidationResult> => {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      formData.append("distribution_mode", distributionMode);
 
       const response = await api.post(
         "/operations/reimbursements/validate-file",
@@ -256,7 +221,10 @@ export const reimbursementsService = {
       );
       return response.data;
     } catch (error) {
-      console.error("reimbursementsService.validateSourceSheet failed:", error);
+      console.error(
+        "reimbursementsService.validateInboundSheet failed:",
+        error,
+      );
       throw error;
     }
   },
@@ -285,6 +253,91 @@ export const reimbursementsService = {
     } catch (error) {
       console.error(
         "reimbursementsService.uploadEvidenceAttachment failed:",
+        error,
+      );
+      throw error;
+    }
+  },
+
+  /**
+   * Fetch template payload stream from backend based on structural constraints
+   * and download directly as a browser payload attachment.
+   */
+  downloadTemplate: async (
+    mode: "SINGLE_SINGLE" | "MANY_SINGLE" | "MANY_MANY",
+    format: "xlsx" | "csv" | "txt",
+  ): Promise<void> => {
+    try {
+      const response = await api.get(
+        "/operations/reimbursements/download-template",
+        {
+          params: {
+            distribution_mode: mode,
+            format: format,
+          },
+          responseType: "blob", // Instruct axios to handle binary data buffers properly
+        },
+      );
+
+      // Construct localized virtual link element matching the specified schema format
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = blobUrl;
+
+      // Dynamic friendly file names matching backend constraints
+      link.setAttribute(
+        "download",
+        `reimbursement_template_${mode.toLowerCase()}.${format}`,
+      );
+
+      document.body.appendChild(link);
+      link.click();
+
+      // Cleanup DOM node traces safely
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error("reimbursementsService.downloadTemplate failed:", error);
+      throw error;
+    }
+  },
+
+  // Add these methods to your reimbursementsService object inside services/reimbursementsService.ts:
+
+  /**
+   * Fetch absolute granular data metrics for a single reimbursement sequence
+   */
+  getReimbursementDetails: async (
+    id: string | number,
+  ): Promise<ReimbursementItem> => {
+    try {
+      const response = await api.get(`/operations/reimbursements/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(
+        `reimbursementsService.getReimbursementDetails failed for ID ${id}:`,
+        error,
+      );
+      throw error;
+    }
+  },
+
+  /**
+   * Update text fields or append additional file attachments on a pending record
+   */
+  updateReimbursement: async (
+    id: string | number,
+    payload: Partial<ReimbursementCreationPayload>,
+  ): Promise<ReimbursementItem> => {
+    try {
+      const response = await api.put(
+        `/operations/reimbursements/${id}`,
+        payload,
+      );
+      return response.data;
+    } catch (error) {
+      console.error(
+        `reimbursementsService.updateReimbursement failed for ID ${id}:`,
         error,
       );
       throw error;

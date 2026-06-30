@@ -15,12 +15,9 @@ import {
   AlertCircle,
   Trash2,
   Download,
-  Zap,
-  ShieldAlert,
-  HelpCircle,
-  Paperclip,
   ChevronDown,
   Search,
+  Paperclip,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToastStore } from "@/hooks/useToastStore";
@@ -33,7 +30,18 @@ type DistributionMode = "SINGLE_SINGLE" | "MANY_SINGLE" | "MANY_MANY";
 type AssetType = "BUNDLE" | "AIRTIME";
 type TemplateFormat = "xlsx" | "csv" | "txt";
 
-// Mock Bundle Database (Representing large ~1000 dataset)
+interface ValidationErrorLog {
+  row: number;
+  identifier: string;
+  reason: string;
+}
+
+interface IngestionMetrics {
+  total: number;
+  valid: number;
+  invalid: number;
+}
+
 const MOCK_BUNDLE_CATEGORIES = [
   "Data",
   "Voice",
@@ -102,10 +110,16 @@ export default function CreateReimbursementPage() {
   // --- SUBSCRIBER CAPTURE TARGETS ---
   const [singleMsisdn, setSingleMsisdn] = useState("");
 
-  // --- BULK INGESTION FILE STATES ---
+  // --- LIVE BULK INGESTION FILE STATES ---
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [fileReferenceId, setFileReferenceId] = useState<string | null>(null);
+  const [bulkMetrics, setBulkMetrics] = useState<IngestionMetrics>({
+    total: 0,
+    valid: 0,
+    invalid: 0,
+  });
+  const [bulkErrors, setBulkErrors] = useState<ValidationErrorLog[]>([]);
 
   // --- EVIDENCE ATTACHMENTS LAYER ---
   const [attachments, setAttachments] = useState<
@@ -132,16 +146,6 @@ export default function CreateReimbursementPage() {
     return () =>
       document.removeEventListener("mousedown", handleOutsideDropdownClick);
   }, []);
-
-  // Mock parsed reporting engine variables
-  const bulkMetrics = { total: 120, valid: 115, invalid: 5 };
-  const bulkErrors = [
-    {
-      row: 3,
-      identifier: "2332400099",
-      reason: "Malformed MSISDN structure allocation count",
-    },
-  ];
 
   // Close combobox search window on outer click
   useEffect(() => {
@@ -173,7 +177,6 @@ export default function CreateReimbursementPage() {
       : "Select a bundle catalog item...";
   }, [targetProductId]);
 
-  // --- FORMATTED DOWNLOAD EVENT TRIGGER ---
   const handleTemplateDownload = (
     mode: DistributionMode,
     format: TemplateFormat,
@@ -184,41 +187,94 @@ export default function CreateReimbursementPage() {
     );
   };
 
-  // --- BATCH INGESTION CONTROLLER ---
-  const handleFileIngestion = (file: File) => {
+  // --- REAL BACK-END REIMBURSEMENT BATCH INGESTION CONTROLLER ---
+  const handleFileIngestion = async (file: File) => {
     setIsProcessingFile(true);
-    setTimeout(() => {
-      setIsProcessingFile(false);
-      setFileReferenceId(
-        `VLT-REF-${Math.floor(100000 + Math.random() * 900000)}`,
+    setBulkErrors([]);
+
+    try {
+      // Execute the live validation API call via the service layer
+      const response = await reimbursementsService.validateInboundSheet(
+        file,
+        distributionMode,
       );
-      setUploadedFile(file);
+
+      if (response.success) {
+        setUploadedFile(file);
+        setFileReferenceId(response.file_reference_id);
+        setBulkMetrics(response.metrics);
+        setBulkErrors(response.errors || []);
+
+        if (response.metrics.invalid > 0) {
+          showToast(
+            `Data matrix parsed with ${response.metrics.invalid} ingestion layout rule conflicts.`,
+            "error",
+          );
+        } else {
+          showToast(
+            "Subscriber mapping file streams parsed successfully without defects.",
+            "success",
+          );
+        }
+      } else {
+        throw new Error(
+          response.message || "File rejected by edge structural validation.",
+        );
+      }
+    } catch (err: any) {
+      setUploadedFile(null);
+      setFileReferenceId(null);
       showToast(
-        "Subscriber parsing engine finished scanning layout streams",
-        "success",
+        err?.message ||
+          "Failed to parse data matrix sheet. Please ensure column layout criteria are satisfied.",
+        "error",
       );
-    }, 900);
+    } finally {
+      setIsProcessingFile(false);
+    }
   };
 
-  // --- EVIDENCE ATTACHMENT CONTROLLER ---
-  const handleAttachmentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // --- FIXED EVIDENCE ATTACHMENT UPLOAD CONTROLLER ---
+  const handleAttachmentUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     setIsUploadingAttachment(true);
-    setTimeout(() => {
-      const newAttachments = Array.from(files).map((f) => ({
-        id: `ATT-${Math.floor(100000 + Math.random() * 900000)}`,
-        name: f.name,
-        size: `${(f.size / (1024 * 1024)).toFixed(2)} MB`,
-      }));
-      setAttachments((prev) => [...prev, ...newAttachments]);
-      setIsUploadingAttachment(false);
+
+    try {
+      const uploadedItems: { id: string; name: string; size: string }[] = [];
+
+      for (const file of Array.from(files)) {
+        // 1. Post file stream to server
+        const response =
+          await reimbursementsService.uploadEvidenceAttachment(file);
+
+        // 2. Safely capture the nested payload data block returned by your controller
+        const serverPayload = (response as any).data;
+
+        if (serverPayload && serverPayload.id) {
+          uploadedItems.push({
+            id: serverPayload.id, // Extracts the string UUID safely
+            name: serverPayload.file_name, // Extracts "Fiche hebdomadaire de Suivi 05 juin 2026.pdf"
+            size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+          });
+        }
+      }
+
+      setAttachments((prev) => [...prev, ...uploadedItems]);
       showToast(
-        `Successfully mounted ${files.length} operational evidence log attachments`,
+        `Uploaded ${files.length} attachment(s) successfully.`,
         "success",
       );
-    }, 700);
+    } catch (error: any) {
+      console.error("Attachment upload error:", error);
+      showToast("Failed to upload evidence files to server.", "error");
+    } finally {
+      setIsUploadingAttachment(false);
+      e.target.value = "";
+    }
   };
 
   const removeAttachment = (id: string | number) => {
@@ -233,13 +289,24 @@ export default function CreateReimbursementPage() {
     if (!ticketId.trim())
       return showToast("Trouble Ticket identifier number is required", "error");
 
+    // CORRECT CODE TO PATCH IN THE FORM SUBMISSION BLOCK ✅
     const payload: ReimbursementCreationPayload = {
-      ticket_id: ticketId.trim(),
+      ticket_id: ticketId,
       reimbursement_type: reimbursementType,
       reimbursement_mode: reimbursementMode,
-      is_bulk: distributionMode !== "SINGLE_SINGLE",
-      description: description.trim() || undefined,
-      attachment_ids: attachments.map((a) => a.id), // Append pre-uploaded structural files array references
+      is_bulk: distributionMode !== "SINGLE_SINGLE", // or true if using file ingestions
+      description: description,
+      target_product_id:
+        reimbursementType === "BUNDLE" ? targetProductId : undefined,
+      amount: reimbursementType === "AIRTIME" ? Number(amount) : undefined,
+      msisdn: distributionMode === "SINGLE_SINGLE" ? singleMsisdn : undefined,
+      file_reference_id: fileReferenceId || undefined,
+
+      // Strict reference array generation: Extract the 'id' parameter
+      // and guarantee that no empty/null elements bypass into the payload
+      attachment_ids: attachments
+        .map((att) => att.id)
+        .filter((id) => id !== null && id !== undefined && id !== ""),
     };
 
     if (distributionMode === "SINGLE_SINGLE") {
@@ -264,6 +331,7 @@ export default function CreateReimbursementPage() {
           "Please attach an initialization target source sheet",
           "error",
         );
+
       payload.file_reference_id = fileReferenceId;
       if (distributionMode === "MANY_SINGLE") {
         if (reimbursementType === "BUNDLE") {
@@ -297,14 +365,13 @@ export default function CreateReimbursementPage() {
         "Endpoint validation error initializing database asset logs",
         "error",
       );
-    }
-    {
+    } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="p-8 max-w-[1350px] mx-auto animate-in fade-in duration-500">
+    <div className="p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
       {/* HEADER STRIP */}
       <div className="flex items-center gap-4 mb-6">
         <button
@@ -421,6 +488,7 @@ export default function CreateReimbursementPage() {
                   setDistributionMode("SINGLE_SINGLE");
                   setUploadedFile(null);
                   setFileReferenceId(null);
+                  setBulkErrors([]);
                 }}
                 className={cn(
                   "py-2 px-3 rounded-lg text-xs font-bold flex flex-col items-center justify-center gap-1 transition-all",
@@ -442,6 +510,7 @@ export default function CreateReimbursementPage() {
                   setDistributionMode("MANY_SINGLE");
                   setUploadedFile(null);
                   setFileReferenceId(null);
+                  setBulkErrors([]);
                 }}
                 className={cn(
                   "py-2 px-3 rounded-lg text-xs font-bold flex flex-col items-center justify-center gap-1 transition-all",
@@ -463,6 +532,7 @@ export default function CreateReimbursementPage() {
                   setDistributionMode("MANY_MANY");
                   setUploadedFile(null);
                   setFileReferenceId(null);
+                  setBulkErrors([]);
                 }}
                 className={cn(
                   "py-2 px-3 rounded-lg text-xs font-bold flex flex-col items-center justify-center gap-1 transition-all",
@@ -499,7 +569,6 @@ export default function CreateReimbursementPage() {
 
               {distributionMode !== "SINGLE_SINGLE" && (
                 <div className="flex flex-col gap-4 animate-in fade-in duration-200">
-                  {/* HEADER ROW WITH DOWNLOAD SELECTOR */}
                   <div className="flex items-center justify-between relative z-40">
                     <div>
                       <span className="text-xs font-bold text-slate-700 block">
@@ -512,7 +581,6 @@ export default function CreateReimbursementPage() {
                       </span>
                     </div>
 
-                    {/* ROBUST STATE-DRIVEN DOWNLOAD SELECTOR MENU */}
                     <div className="relative" ref={templateDropdownRef}>
                       <button
                         type="button"
@@ -547,7 +615,6 @@ export default function CreateReimbursementPage() {
                     </div>
                   </div>
 
-                  {/* THE ACTUAL FILE INPUT DRAG/DROP ZONE RENDERER */}
                   {renderFileZone()}
                 </div>
               )}
@@ -557,7 +624,7 @@ export default function CreateReimbursementPage() {
 
         {/* RIGHT COLUMN PANEL: ASSET SPECIFICATION & ATTACHMENTS */}
         <div className="lg:col-span-5 flex flex-col gap-6">
-          {/* SECTION 3: ASSET CONFIGURATION (CASCADING + COMBOBOX SEARCH) */}
+          {/* SECTION 3: ASSET CONFIGURATION */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col gap-4">
             <div className="border-b border-slate-100 pb-3 flex items-center gap-2">
               <Package className="h-4 w-4 text-indigo-600" />
@@ -604,7 +671,6 @@ export default function CreateReimbursementPage() {
 
                 {reimbursementType === "BUNDLE" ? (
                   <div className="grid grid-cols-1 gap-3 border-t border-slate-100 pt-3">
-                    {/* CASCADE STEP 1: CATEGORY SELECTION */}
                     <div className="flex flex-col gap-1.5">
                       <label className="text-xs font-bold text-slate-600">
                         Package Group Category
@@ -631,7 +697,6 @@ export default function CreateReimbursementPage() {
                       </div>
                     </div>
 
-                    {/* CASCADE STEP 2: SEARCHABLE COMBOBOX SELECTION */}
                     <div
                       className="flex flex-col gap-1.5 relative"
                       ref={dropdownRef}
@@ -753,17 +818,28 @@ export default function CreateReimbursementPage() {
                     key={att.id}
                     className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs animate-in slide-in-from-top-1 duration-150"
                   >
-                    <div className="flex items-center gap-2 font-semibold text-slate-700">
-                      <FileText className="h-3.5 w-3.5 text-indigo-500" />
-                      <span className="truncate max-w-[180px]">{att.name}</span>
-                      <span className="text-[9px] font-mono font-normal text-slate-400">
+                    {/* flex-1 and min-w-0 forces the flex container to respect text boundaries */}
+                    <div className="flex items-center gap-2 font-semibold text-slate-700 min-w-0 flex-1 pr-4">
+                      <Paperclip className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+
+                      {/* Name section with responsive truncation layout */}
+                      <span
+                        className="truncate text-slate-800 font-bold max-w-[240px] block"
+                        title={att.name}
+                      >
+                        {att.name}
+                      </span>
+
+                      {/* Size Badge */}
+                      <span className="text-[10px] font-mono font-normal text-slate-400 shrink-0">
                         ({att.size})
                       </span>
                     </div>
+
                     <button
                       type="button"
                       onClick={() => removeAttachment(att.id)}
-                      className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                      className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -797,8 +873,19 @@ export default function CreateReimbursementPage() {
     </div>
   );
 
-  // --- COMPACT DATA SHEET SUMMARY RENDERER ---
+  // --- COMPACT LIVE BACK-END REGISTRY SUMMARY RENDERER ---
   function renderFileZone() {
+    if (isProcessingFile) {
+      return (
+        <div className="border border-dashed border-indigo-200 bg-indigo-50/20 rounded-xl p-8 text-center flex flex-col items-center justify-center gap-3">
+          <div className="h-6 w-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-xs font-bold text-indigo-700">
+            Streaming source data arrays to ledger rules validation engine...
+          </span>
+        </div>
+      );
+    }
+
     if (!uploadedFile) {
       return (
         <div
@@ -808,10 +895,7 @@ export default function CreateReimbursementPage() {
             if (e.dataTransfer.files?.[0])
               handleFileIngestion(e.dataTransfer.files[0]);
           }}
-          className={cn(
-            "border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-white rounded-xl p-8 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1.5 relative",
-            isProcessingFile && "opacity-40 pointer-events-none",
-          )}
+          className="border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-white rounded-xl p-8 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1.5 relative"
         >
           <input
             type="file"
@@ -851,8 +935,9 @@ export default function CreateReimbursementPage() {
             onClick={() => {
               setUploadedFile(null);
               setFileReferenceId(null);
+              setBulkErrors([]);
             }}
-            className="p-1 text-slate-400 hover:text-red-500 rounded-lg"
+            className="p-1 text-slate-400 hover:text-red-500 rounded-lg transition-colors"
           >
             <Trash2 className="h-4 w-4" />
           </button>
@@ -887,37 +972,45 @@ export default function CreateReimbursementPage() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-1">
-          <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider block">
-            Ingestion Fault Diagnostics Logs
-          </span>
-          <div className="border border-red-100 rounded-lg overflow-hidden text-[11px] bg-white">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-red-50/30 border-b border-red-100 text-red-700 text-left font-bold">
-                  <th className="p-2 w-16">Row ID</th>
-                  <th className="p-2 w-28">Identifier</th>
-                  <th className="p-2">Failure Reason Description Framework</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-red-50 text-slate-600 font-medium">
-                {bulkErrors.map((err) => (
-                  <tr key={err.row}>
-                    <td className="p-2 font-bold font-mono text-red-600">
-                      Row {err.row}
-                    </td>
-                    <td className="p-2 font-mono text-slate-500">
-                      {err.identifier}
-                    </td>
-                    <td className="p-2 text-slate-400 truncate max-w-[180px]">
-                      {err.reason}
-                    </td>
+        {/* RENDERS LIVE ERROR LOG RECORDS ONLY IF AN UNMAPPED PARSING FAILURE OCCURS */}
+        {bulkErrors.length > 0 && (
+          <div className="flex flex-col gap-1 animate-in slide-in-from-top-2 duration-200">
+            <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider block">
+              Ingestion Fault Diagnostics Logs
+            </span>
+            <div className="border border-red-100 rounded-lg overflow-hidden text-[11px] bg-white max-h-48 overflow-y-auto shadow-inner">
+              <table className="w-full border-collapse">
+                <thead className="sticky top-0 bg-red-50 z-10">
+                  <tr className="border-b border-red-100 text-red-700 text-left font-bold">
+                    <th className="p-2 w-16">Row ID</th>
+                    <th className="p-2 w-32">Identifier</th>
+                    <th className="p-2">
+                      Failure Reason Description Framework
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-red-50 text-slate-600 font-medium">
+                  {bulkErrors.map((err, index) => (
+                    <tr
+                      key={`${err.row}-${index}`}
+                      className="hover:bg-red-50/20 transition-colors"
+                    >
+                      <td className="p-2 font-bold font-mono text-red-600">
+                        Row {err.row}
+                      </td>
+                      <td className="p-2 font-mono text-slate-500 break-all">
+                        {err.identifier}
+                      </td>
+                      <td className="p-2 text-slate-500 leading-relaxed text-xs">
+                        {err.reason}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     );
   }

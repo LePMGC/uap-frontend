@@ -103,14 +103,31 @@ export default function ReimbursementsPage() {
       );
 
       if (response) {
-        setData(response.data || []);
+        // Cast response to any temporarily so TypeScript allows checking your nested backend fields
+        const rawResponse = response as any;
+
+        // Extract the true array records safely
+        const records =
+          rawResponse.data &&
+          typeof rawResponse.data === "object" &&
+          Array.isArray(rawResponse.data.data)
+            ? rawResponse.data.data
+            : Array.isArray(rawResponse.data)
+              ? rawResponse.data
+              : [];
+
+        setData(records);
+
+        // Extract pagination meta safely wherever your backend paginator nested them
+        const meta = rawResponse.meta || rawResponse.data?.meta || rawResponse;
+
         setPagination({
-          current_page: response.current_page,
-          total: response.total,
-          last_page: response.last_page,
-          per_page: response.per_page,
-          from: response.from || 0,
-          to: response.to || 0,
+          current_page: meta?.current_page || 1,
+          total: meta?.total || 0,
+          last_page: meta?.last_page || 1,
+          per_page: meta?.per_page || 10,
+          from: meta?.from || 0,
+          to: meta?.to || 0,
         });
       }
 
@@ -336,119 +353,6 @@ export default function ReimbursementsPage() {
   ];
 
   // Multi-selector configuration mapped directly into GenericDataTable select layers
-  const filterConfigs = [
-    {
-      id: "status",
-      label: "All Statuses",
-      value: statusFilter,
-      options: [
-        { label: "Pending Approval", value: "pending" },
-        { label: "Approved Queue", value: "approved" },
-        { label: "Provisioned Successfully", value: "success" },
-        { label: "Rejected Requests", value: "rejected" },
-        { label: "System Failed", value: "failed" },
-      ],
-      onChange: (val: string) => {
-        setStatusFilter(val);
-        setPagination((prev) => ({ ...prev, current_page: 1 }));
-      },
-    },
-    {
-      id: "reimbursement_type",
-      label: "All Resource Types",
-      value: typeFilter,
-      options: [
-        { label: "Airtime Topups", value: "AIRTIME" },
-        { label: "Data/Bundle Packages", value: "BUNDLE" },
-      ],
-      onChange: (val: string) => {
-        setTypeFilter(val);
-        setPagination((prev) => ({ ...prev, current_page: 1 }));
-      },
-    },
-    {
-      id: "required_tier",
-      label: "All Approval Tiers",
-      value: tierFilter,
-      options: [
-        { label: "Tier 1 Clearance", value: "1" },
-        { label: "Tier 2 Clearance", value: "2" },
-        { label: "Tier 3 Clearance", value: "3" },
-      ],
-      onChange: (val: string) => {
-        setTierFilter(val);
-        setPagination((prev) => ({ ...prev, current_page: 1 }));
-      },
-    },
-    {
-      id: "reimbursement_mode",
-      label: "All Execution Modes",
-      value: modeFilter,
-      options: [
-        { label: "Automated (AUTO)", value: "AUTO" },
-        { label: "Manual Processing", value: "MANUAL" },
-      ],
-      onChange: (val: string) => {
-        setModeFilter(val);
-        setPagination((prev) => ({ ...prev, current_page: 1 }));
-      },
-    },
-    {
-      id: "created_from",
-      custom: (
-        <input
-          type="date"
-          value={createdAtStart}
-          onChange={(e) => {
-            setCreatedAtStart(e.target.value);
-            setPagination((prev) => ({
-              ...prev,
-              current_page: 1,
-            }));
-          }}
-          className="h-9 rounded-md border border-slate-200 px-3 text-sm"
-        />
-      ),
-    },
-
-    {
-      id: "created_to",
-      custom: (
-        <input
-          type="date"
-          value={createdAtEnd}
-          onChange={(e) => {
-            setCreatedAtEnd(e.target.value);
-            setPagination((prev) => ({
-              ...prev,
-              current_page: 1,
-            }));
-          }}
-          className="h-9 rounded-md border border-slate-200 px-3 text-sm"
-        />
-      ),
-    },
-
-    {
-      id: "clear_dates",
-      custom:
-        createdAtStart || createdAtEnd ? (
-          <button
-            onClick={() => {
-              setCreatedAtStart("");
-              setCreatedAtEnd("");
-              setPagination((prev) => ({
-                ...prev,
-                current_page: 1,
-              }));
-            }}
-            className="h-9 px-3 rounded-md bg-red-50 border border-red-200 text-red-600 text-sm hover:bg-red-100"
-          >
-            Clear
-          </button>
-        ) : null,
-    },
-  ];
 
   if (!canViewAll && !canViewOwn) {
     return (
