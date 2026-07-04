@@ -131,6 +131,8 @@ export default function CreateReimbursementPage() {
 
   const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false);
   const templateDropdownRef = useRef<HTMLDivElement>(null);
+  const [isDownloading, setIsDownloading] = useState<boolean>(false);
+  const [templateFormat, setTemplateFormat] = useState<TemplateFormat>("xlsx");
 
   // Close the template dropdown when clicking outside
   useEffect(() => {
@@ -177,14 +179,30 @@ export default function CreateReimbursementPage() {
       : "Select a bundle catalog item...";
   }, [targetProductId]);
 
-  const handleTemplateDownload = (
-    mode: DistributionMode,
-    format: TemplateFormat,
-  ) => {
-    showToast(
-      `Downloading template payload schema matching ${mode} in format: .${format.toUpperCase()}`,
-      "success",
-    );
+  // --- DYNAMIC LIVE FILE TEMPLATE DOWNLOAD HANDLER ---
+  const handleTemplateDownload = async () => {
+    try {
+      setIsDownloading(true);
+
+      // Consume the service layer function by passing the component's state values
+      await reimbursementsService.downloadTemplate(
+        distributionMode,
+        templateFormat,
+      );
+
+      showToast(
+        "Template spreadsheet layout saved to downloads directory.",
+        "success",
+      );
+    } catch (error) {
+      console.error("Template down-stream extraction workflow failure:", error);
+      showToast(
+        "Failed to retrieve target template structure from API.",
+        "error",
+      );
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   // --- REAL BACK-END REIMBURSEMENT BATCH INGESTION CONTROLLER ---
@@ -559,7 +577,7 @@ export default function CreateReimbursementPage() {
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. 233244112233"
+                    placeholder="e.g. 242067390275"
                     value={singleMsisdn}
                     onChange={(e) => setSingleMsisdn(e.target.value)}
                     className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800 outline-none focus:border-indigo-500 transition-all"
@@ -601,7 +619,8 @@ export default function CreateReimbursementPage() {
                                 key={fmt}
                                 type="button"
                                 onClick={() => {
-                                  handleTemplateDownload(distributionMode, fmt);
+                                  setTemplateFormat(fmt);
+                                  handleTemplateDownload();
                                   setIsTemplateDropdownOpen(false);
                                 }}
                                 className="w-full text-left px-3 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 block transition-colors"

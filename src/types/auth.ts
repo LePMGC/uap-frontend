@@ -56,6 +56,7 @@ export const PERM = {
   VIEW_ALL_REIMBURSEMENTS: "view_all_reimbursements",
   VIEW_OWN_REIMBURSEMENTS: "view_own_reimbursements",
   MANAGE_REIMBURSEMENT_SETTINGS: "manage_reimbursement_settings",
+  CANCEL_REIMBURSEMENTS: "cancel_reimbursements",
 
   // Single Command Execution & Logs
   EXECUTE_COMMANDS: "execute_commands",

@@ -41,6 +41,9 @@ export interface ReimbursementItem {
   requested_by_user_id: string | number;
   approved_by_user_id?: string | number | null;
   created_at: string;
+  input_file_url: string | null;
+  is_bulk: boolean;
+  distribution_mode: "SINGLE_SINGLE" | "MANY_SINGLE" | "MANY_MANY";
 
   // ADD THESE TWO LINES TO FIX THE COMPILATION COMPLAINT:
   requester_name?: string | null;
@@ -98,6 +101,18 @@ export interface UploadedAttachmentResult {
   id: string | number;
   file_name: string;
   file_url: string;
+}
+
+export interface ReimbursementUpdatePayload {
+  ticket_id: string;
+  description: string;
+  reimbursement_type: "BUNDLE" | "AIRTIME";
+  reimbursement_mode: "AUTO" | "MANUAL";
+  target_product_id?: string;
+  amount?: number;
+  attachment_ids: string[];
+  // Append new staging identifier property for bulk overwrite cycles
+  new_file_reference_id?: string;
 }
 
 // --- SERVICE IMPLEMENTATION ---
@@ -160,7 +175,9 @@ export const reimbursementsService = {
   /**
    * Approve a pending validation transaction. Moves context logic into automatic dispatch layers.
    */
-  approve: async (id: number | string): Promise<ReimbursementItem> => {
+  approveReimbursement: async (
+    id: number | string,
+  ): Promise<ReimbursementItem> => {
     try {
       const response = await api.post(
         `/operations/reimbursements/${id}/approve`,
@@ -179,7 +196,7 @@ export const reimbursementsService = {
    * Decline and archive a pending reimbursement request.
    * Explicitly requires a detailed string statement explaining why authorization was denied.
    */
-  reject: async (
+  rejectReimbursement: async (
     id: number | string,
     rejectionReason: string,
   ): Promise<ReimbursementItem> => {
@@ -195,6 +212,19 @@ export const reimbursementsService = {
       console.error(`reimbursementsService.reject failed for ID ${id}:`, error);
       throw error;
     }
+  },
+
+  /**
+   * Cancels a pending reimbursement request.
+   * @param id The unique identifier of the reimbursement transaction.
+   * @returns A promise resolving to the server's acknowledgment payload.
+   */
+  cancelReimbursement: async (
+    id: string,
+  ): Promise<{ success: boolean; message?: string }> => {
+    // Utilizing your project's configured API instance
+    const response = await api.post(`/reimbursements/${id}/cancel`);
+    return response.data;
   },
 
   /**
@@ -340,6 +370,65 @@ export const reimbursementsService = {
         `reimbursementsService.updateReimbursement failed for ID ${id}:`,
         error,
       );
+      throw error;
+    }
+  },
+
+  /**
+   * Extract the active live subset ledger rows mapping for a specific bulk batch reimbursement
+   * and stream it directly back to the local client browser session as an structured workbook layout.
+   */
+  downloadCurrentSubscribers: async (
+    id: string,
+    format: "xlsx" | "csv" | "txt" = "xlsx",
+  ): Promise<void> => {
+    // Real implementation will stream binary octet stream or window location attachments.
+    console.log(
+      `Downloading subscriber snapshot ledger for id: ${id} as format: .${format}`,
+    );
+    return new Promise((resolve) => setTimeout(resolve, 1000));
+  },
+
+  /**
+   * Securely download the bulk reimbursement batch input file in its native format.
+   */
+  downloadInputFile: async (id: string | number): Promise<void> => {
+    try {
+      const response = await api.get(
+        `/operations/reimbursements/${id}/download-input-file`,
+        {
+          responseType: "blob", // Instruct Axios to listen for raw file binary bytes
+        },
+      );
+
+      // Create object URL from binary data stream bytes
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = blobUrl;
+
+      // Read Content-Disposition to grab the filename sent from the backend
+      const contentDisposition = response.headers["content-disposition"];
+      let filename = `reimbursement_input_file_${id}.csv`; // Dynamic fallback safety
+
+      if (contentDisposition) {
+        // Look for filename="..." inside the header string value
+        const filenameMatch = contentDisposition.match(/filename="(.+?)"/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1]; // Resolves to 'subscriber_list_VLT-REF-XXXX.csv' or '.xlsx'
+        }
+      }
+
+      // Instruct the browser to use the exact backend filename and extension format
+      link.setAttribute("download", filename);
+
+      document.body.appendChild(link);
+      link.click();
+
+      // Clean up DOM components and memory allocation references
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error("reimbursementsService.downloadInputFile failed:", error);
       throw error;
     }
   },

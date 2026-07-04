@@ -6,7 +6,6 @@ import {
   XCircle,
   Eye,
   DollarSign,
-  AlertCircle,
   ThumbsUp,
   Ban,
   Paperclip,
@@ -300,55 +299,6 @@ export default function ReimbursementsPage() {
       label: "View Request Details",
       icon: <Eye className="h-3.5 w-3.5" />,
       onClick: (item: any) => navigate(`/reimbursements/${item.id}`),
-    },
-    {
-      label: "Approve Transaction",
-      icon: <ThumbsUp className="h-3.5 w-3.5" />,
-      onClick: async (item: any) => {
-        if (
-          !window.confirm(
-            "Are you sure you want to authorize this reimbursement adjustment?",
-          )
-        )
-          return;
-        try {
-          await reimbursementsService.approve(item.id);
-          showToast("Adjustment authorized successfully", "success");
-          fetchData();
-        } catch {
-          showToast("Failed to finalize approval workflow", "error");
-        }
-      },
-      hidden: (item: any) =>
-        item.status !== "pending" || !verifyApprovalPrivileges(item),
-    },
-    {
-      label: "Reject Request",
-      icon: <Ban className="h-3.5 w-3.5" />,
-      variant: "danger" as const,
-      onClick: async (item: any) => {
-        const reason = window.prompt(
-          "A rejection reason is strictly required to decline this request:",
-        );
-        if (reason === null) return; // User cancelled prompt
-        if (!reason.trim()) {
-          showToast(
-            "Rejection cancelled: A valid reason statement must be filled out.",
-            "error",
-          );
-          return;
-        }
-
-        try {
-          await reimbursementsService.reject(item.id, reason.trim());
-          showToast("Adjustment rejected and archived", "success");
-          fetchData();
-        } catch {
-          showToast("Failed to process rejection statement", "error");
-        }
-      },
-      hidden: (item: any) =>
-        item.status !== "pending" || !verifyApprovalPrivileges(item),
     },
   ];
 
