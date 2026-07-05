@@ -83,13 +83,16 @@ export default function App() {
           <Route path="audit-logs" element={<AuditLogsPage />} />
 
           <Route
-            path="commands-defintions"
+            path="commands-definitions"
             element={<CommandDefinitionsPage />}
           />
 
-          <Route path="commands-defintions/:id" element={<CommandFormPage />} />
           <Route
-            path="commands-defintions/create"
+            path="commands-definitions/:id"
+            element={<CommandFormPage />}
+          />
+          <Route
+            path="commands-definitions/create"
             element={<CommandFormPage />}
           />
 

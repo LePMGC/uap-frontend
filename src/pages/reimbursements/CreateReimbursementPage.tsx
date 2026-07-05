@@ -54,31 +54,31 @@ const MOCK_BUNDLES_DB = [
     id: "DATA_DAILY_1GB",
     name: "Daily Heavy Data 1GB",
     category: "Data",
-    price: "GHS 10.00",
+    price: "CFA 10.00",
   },
   {
     id: "DATA_WEEKLY_5GB",
     name: "Weekly Super Surf 5GB",
     category: "Data",
-    price: "GHS 50.00",
+    price: "CFA 50.00",
   },
   {
     id: "VOICE_MONTHLY_600M",
     name: "TalkMore Monthly 600 Mins",
     category: "Voice",
-    price: "GHS 30.00",
+    price: "CFA 30.00",
   },
   {
     id: "SMS_BATCH_500",
     name: "Enterprise Bulk 500 SMS Pack",
     category: "SMS",
-    price: "GHS 5.00",
+    price: "CFA 5.00",
   },
   {
     id: "COMBO_BIZ_PREMIUM",
     name: "Executive Uncapped Combo Bundle",
     category: "Combo",
-    price: "GHS 250.00",
+    price: "CFA 250.00",
   },
 ];
 
@@ -131,7 +131,7 @@ export default function CreateReimbursementPage() {
 
   const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false);
   const templateDropdownRef = useRef<HTMLDivElement>(null);
-  const [isDownloading, setIsDownloading] = useState<boolean>(false);
+  const [, setIsDownloading] = useState<boolean>(false);
   const [templateFormat, setTemplateFormat] = useState<TemplateFormat>("xlsx");
 
   // Close the template dropdown when clicking outside
@@ -786,7 +786,7 @@ export default function CreateReimbursementPage() {
                 ) : (
                   <div className="flex flex-col gap-1.5 border-t border-slate-100 pt-3">
                     <label className="text-xs font-bold text-slate-600">
-                      Airtime Cash Value Topup Amount (GHS)
+                      Airtime Cash Value Topup Amount (CFA)
                     </label>
                     <div className="relative">
                       <Coins className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />

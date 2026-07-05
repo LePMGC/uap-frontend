@@ -10,25 +10,19 @@ export function NavigationBar() {
   const navigate = useNavigate();
 
   const handleCloseTab = (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
     e.stopPropagation();
 
-    // If we are closing the current active tab, we must navigate away
-    if (id === activeTabId) {
-      const currentIndex = tabs.findIndex((t: any) => t.id === id);
-      // Logic: Go to the previous tab, or the next one if it's the first tab
-      const nextTab = tabs[currentIndex - 1] || tabs[currentIndex + 1];
+    const nextTab = removeTab(id);
 
+    // IMPORTANT: allow store to control state first
+    requestAnimationFrame(() => {
       if (nextTab) {
         navigate(nextTab.url);
-        setActiveTab(nextTab.id);
       } else {
-        // If no tabs left (shouldn't happen with dashboard fixed), go home
         navigate("/dashboard");
-        setActiveTab("dashboard");
       }
-    }
-
-    removeTab(id);
+    });
   };
 
   return (
@@ -41,7 +35,6 @@ export function NavigationBar() {
           <div
             key={tab.id}
             onClick={() => {
-              setActiveTab(tab.id);
               navigate(tab.url);
             }}
             className={cn(

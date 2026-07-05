@@ -204,7 +204,7 @@ export const reimbursementsService = {
       const response = await api.post(
         `/operations/reimbursements/${id}/reject`,
         {
-          rejection_reason: rejectionReason,
+          reason: rejectionReason,
         },
       );
       return response.data;

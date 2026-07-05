@@ -68,9 +68,9 @@ export default function CommandFormPage() {
         : userPermissions.includes(PERM.SMPP.CREATE);
     }
 
-    return userPermissions.includes(
-      PERM.MANAGE_ALL_COMMANDS,
-      PERM.MANAGE_OWN_COMMANDS,
+    return (
+      userPermissions.includes(PERM.MANAGE_ALL_COMMANDS) ||
+      userPermissions.includes(PERM.MANAGE_OWN_COMMANDS)
     );
   }, [formData.category_slug, userPermissions, isEdit]);
 

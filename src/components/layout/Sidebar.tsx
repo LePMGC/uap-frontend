@@ -13,7 +13,6 @@ import {
   LogOut,
   ChevronRight,
   ListFilter,
-  Redo,
   ReceiptEuro,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
@@ -102,7 +101,7 @@ const menuGroups = [
       {
         name: "Command Defs",
         icon: Code2,
-        url: "/commands-defintions",
+        url: "/commands-definitions",
         requiredPermission: PERM.VIEW_OWN_COMMANDS,
       },
     ],
@@ -137,6 +136,9 @@ const menuGroups = [
   },
 ];
 
+const getFeatureKey = (path: string) =>
+  path.replace(/^\/+|\/+$/g, "").split("/")[0];
+
 export function Sidebar() {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
@@ -166,7 +168,9 @@ export function Sidebar() {
               </p>
               <div className="space-y-1">
                 {group.items.map((item) => {
-                  const isActive = location.pathname === item.url;
+                  const isActive =
+                    getFeatureKey(location.pathname) ===
+                    getFeatureKey(item.url);
 
                   return (
                     /* Wrap the granular link inside a single string validation check */

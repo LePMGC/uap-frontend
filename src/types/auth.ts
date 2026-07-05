@@ -1,6 +1,12 @@
-import { manual } from "prismjs";
+export type UserRole = string;
 
-export type UserRole = string; // Backend-driven role names
+export interface User {
+  id?: string | number;
+  name: string;
+  email?: string;
+  role?: string;
+  permissions?: string[];
+}
 
 export const PERM = {
   // Roles & Permissions
@@ -33,7 +39,7 @@ export const PERM = {
   PING_INSTANCES: "ping_instances",
   GET_INSTANCE_COMMANDS: "get_instance_commands",
 
-  // Database-driven Command Management (Blueprints)
+  // Database-driven Command Management
   VIEW_ALL_COMMANDS: "view_all_commands",
   VIEW_OWN_COMMANDS: "view_own_commands",
   MANAGE_ALL_COMMANDS: "manage_all_commands",
@@ -47,7 +53,7 @@ export const PERM = {
   DELETE_DATASOURCES: "delete_datasources",
   TEST_DATASOURCES: "test_datasources",
 
-  // Reimbursements Management
+  // Reimbursements
   APPROVE_TIER3_REIMBURSEMENTS: "approve_tier3_reimbursements",
   APPROVE_TIER2_REIMBURSEMENTS: "approve_tier2_reimbursements",
   APPROVE_TIER1_REIMBURSEMENTS: "approve_tier1_reimbursements",
@@ -58,13 +64,13 @@ export const PERM = {
   MANAGE_REIMBURSEMENT_SETTINGS: "manage_reimbursement_settings",
   CANCEL_REIMBURSEMENTS: "cancel_reimbursements",
 
-  // Single Command Execution & Logs
+  // Commands
   EXECUTE_COMMANDS: "execute_commands",
   EXECUTE_ALL_COMMANDS: "execute_all_commands",
   VIEW_ALL_COMMAND_LOGS: "view_all_command_logs",
   VIEW_OWN_COMMAND_LOGS: "view_own_command_logs",
 
-  // Template Management
+  // Batch Templates
   VIEW_ALL_BATCH_TEMPLATES: "view_all_batch_templates",
   VIEW_OWN_BATCH_TEMPLATES: "view_own_batch_templates",
   CREATE_BATCH_TEMPLATES: "create_batch_templates",
@@ -74,7 +80,7 @@ export const PERM = {
   MANAGE_OWN_BATCH_TEMPLATES: "manage_own_batch_templates",
   DISCOVER_BATCH_HEADERS: "discover_batch_headers",
 
-  // Execution & Monitoring (Batch Instances)
+  // Batch Instances
   RUN_BATCH_JOBS: "run_batch_jobs",
   VIEW_ALL_BATCH_INSTANCES: "view_all_batch_instances",
   VIEW_OWN_BATCH_INSTANCES: "view_own_batch_instances",
@@ -86,14 +92,14 @@ export const PERM = {
   MANAGE_BATCH_SCHEDULES: "manage_batch_schedules",
   MANAGE_OWN_BATCH_SCHEDULES: "manage_own_batch_schedules",
 
-  // Audit & Observability Logs
+  // Audit
   VIEW_AUDIT_LOGS: "view_audit_logs",
   VIEW_SECURITY_LOGS: "view_security_logs",
   VIEW_TRACE_TIMELINE: "view_trace_timeline",
   VIEW_CONNECTIVITY_STATS: "view_connectivity_stats",
   EXPORT_AUDIT_LOGS: "export_audit_logs",
 
-  // Dynamic Command Actions (Protocol Level Operations)
+  // Ericsson UCIP
   ERICSSON_UCIP: {
     VIEW: "ericsson-ucip.view",
     CREATE: "ericsson-ucip.create",
@@ -103,6 +109,8 @@ export const PERM = {
     GET: "ericsson-ucip.get",
     SET: "ericsson-ucip.set",
   },
+
+  // Ericsson CAI
   ERICSSON_CAI: {
     VIEW: "ericsson-cai.view",
     CREATE: "ericsson-cai.create",
@@ -112,6 +120,8 @@ export const PERM = {
     GET: "ericsson-cai.get",
     SET: "ericsson-cai.set",
   },
+
+  // SMPP
   SMPP: {
     VIEW: "smpp.view",
     CREATE: "smpp.create",
@@ -123,4 +133,23 @@ export const PERM = {
   },
 } as const;
 
-export type PermissionType = (typeof PERM)[keyof typeof PERM] | string;
+/**
+ * Recursively extracts only the leaf string values from a nested object.
+ */
+type LeafValues<T> = T extends string
+  ? T
+  : T extends Record<string, unknown>
+    ? LeafValues<T[keyof T]>
+    : never;
+
+/**
+ * Union of every permission string in PERM.
+ *
+ * Examples:
+ * - "view_users"
+ * - "view_roles"
+ * - "execute_commands"
+ * - "ericsson-ucip.view"
+ * - "smpp.run"
+ */
+export type PermissionType = LeafValues<typeof PERM>;

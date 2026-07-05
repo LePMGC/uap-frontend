@@ -63,49 +63,49 @@ const MOCK_BUNDLES_DB = [
     id: "DATA_DAILY_1GB",
     name: "Daily Heavy Data 1GB",
     category: "Data",
-    price: "GHS 10.00",
+    price: "CFA 10.00",
   },
   {
     id: "DATA_WEEKLY_5GB",
     name: "Weekly Super Data 5GB",
     category: "Data",
-    price: "GHS 50.00",
+    price: "CFA 50.00",
   },
   {
     id: "DATA_MONTHLY_20GB",
     name: "Monthly Elite Data 20GB",
     category: "Data",
-    price: "GHS 150.00",
+    price: "CFA 150.00",
   },
   {
     id: "VOICE_DAILY_MINS",
     name: "Daily Talk 50 Mins",
     category: "Voice",
-    price: "GHS 5.00",
+    price: "CFA 5.00",
   },
   {
     id: "VOICE_MONTHLY_600M",
     name: "Monthly Corporate 600 Mins",
     category: "Voice",
-    price: "GHS 80.00",
+    price: "CFA 80.00",
   },
   {
     id: "SMS_WEEKLY_MAX",
     name: "Weekly SMS Blast 500 SMS",
     category: "SMS",
-    price: "GHS 12.00",
+    price: "CFA 12.00",
   },
   {
     id: "COMBO_WEEKLY_MED",
     name: "Weekly Hybrid Med Bundle",
     category: "Combo",
-    price: "GHS 25.00",
+    price: "CFA 25.00",
   },
   {
     id: "INT_ZONE_A_ROAM",
     name: "International Roaming Zone A",
     category: "International",
-    price: "GHS 200.00",
+    price: "CFA 200.00",
   },
 ];
 
@@ -972,7 +972,7 @@ export default function ReimbursementDetailsPage() {
                 ) : (
                   <div className="relative mt-1.5 max-w-xs">
                     <span className="absolute left-3 top-2.5 text-slate-400 font-bold font-mono text-[11px]">
-                      GHS
+                      CFA
                     </span>
                     <input
                       type="number"
@@ -988,7 +988,7 @@ export default function ReimbursementDetailsPage() {
                 <span className="font-bold text-slate-900 mt-0.5 font-mono text-xs">
                   {reimbursementType === "BUNDLE"
                     ? targetProductId || "None chosen"
-                    : `AIRTIME AMOUNT: GHS ${Number(amount || 0).toFixed(2)}`}
+                    : `AIRTIME AMOUNT: CFA ${Number(amount || 0).toFixed(2)}`}
                 </span>
               )}
             </div>

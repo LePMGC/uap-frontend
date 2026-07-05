@@ -167,7 +167,7 @@ export function CommandGrid({
     {
       label: "Edit Definition",
       icon: <Edit2 className="h-3.5 w-3.5" />,
-      onClick: (item: any) => navigate(`/commands-defintions/${item.id}`),
+      onClick: (item: any) => navigate(`/commands-definitions/${item.id}`),
     },
     {
       label: "Delete Command",

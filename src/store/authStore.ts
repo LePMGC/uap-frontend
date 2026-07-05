@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { jwtDecode } from "jwt-decode"; // Import the decoder
 import type { User } from "@/types/auth";
+// 1. Import the tab store to clear workspace states upon session termination
+import { useTabStore } from "@/store/tabStore";
 
 interface AuthState {
   user: User | null;
@@ -56,14 +58,27 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      logout: () =>
+      logout: () => {
+        // 2. Clear the global tab layout state to close all open workspace view frames
+        if (typeof useTabStore.getState().resetTabs === "function") {
+          useTabStore.getState().resetTabs();
+        } else {
+          // Fallback safe patch in case resetTabs isn't fully written in tabStore yet
+          useTabStore.setState({
+            tabs: [{ id: "dashboard", title: "Dashboard", url: "/dashboard" }],
+            activeTabId: "dashboard",
+          });
+        }
+
+        // 3. Reset the primary user authentication indicators
         set({
           user: null,
           accessToken: null,
           refreshToken: null,
           isAuthenticated: false,
           needsPasswordChange: false,
-        }),
+        });
+      },
     }),
     { name: "uap-auth-storage" },
   ),

@@ -281,64 +281,107 @@ export function GenericDataTable<T>({
 
                   {hasActions && (
                     <td className="px-6 py-4 text-right">
-                      <div className="relative flex justify-end">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const rect =
-                              e.currentTarget.getBoundingClientRect();
-                            setMenuPosition({
-                              top: rect.bottom + window.scrollY,
-                              left: rect.right - 192 + window.scrollX,
-                            });
-                            setOpenMenuId(
-                              openMenuId === rowIdx ? null : rowIdx,
-                            );
-                          }}
-                          className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-900 transition-colors"
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </button>
+                      {(() => {
+                        const visibleActions = allowedActions.filter(
+                          (action) => !action.hidden?.(item),
+                        );
 
-                        {openMenuId === rowIdx &&
-                          createPortal(
-                            <div
-                              ref={menuRef}
-                              className="fixed w-48 bg-white rounded-xl shadow-xl border border-slate-100 py-1 z-[9999]"
-                              style={{
-                                top: menuPosition.top,
-                                left: menuPosition.left,
-                              }}
-                            >
-                              {allowedActions.map((action, actionIdx) => {
-                                if (action.hidden?.(item)) return null;
+                        if (visibleActions.length === 0) {
+                          return null;
+                        }
 
-                                return (
-                                  <button
-                                    key={actionIdx}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      action.onClick(item);
-                                      setOpenMenuId(null);
-                                    }}
-                                    className={cn(
-                                      "w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold transition-colors",
-                                      action.variant === "danger"
-                                        ? "text-red-600 hover:bg-red-50"
-                                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
-                                    )}
-                                  >
-                                    {action.icon}
-                                    {typeof action.label === "function"
-                                      ? action.label(item)
-                                      : action.label}
-                                  </button>
+                        // Single action -> render icon button directly
+                        if (visibleActions.length === 1) {
+                          const action = visibleActions[0];
+
+                          return (
+                            <div className="flex justify-end">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  action.onClick(item);
+                                }}
+                                title={
+                                  typeof action.label === "function"
+                                    ? action.label(item)
+                                    : action.label
+                                }
+                                className={cn(
+                                  "p-2 rounded-lg transition-colors",
+                                  action.variant === "danger"
+                                    ? "text-red-600 hover:bg-red-50"
+                                    : "text-slate-400 hover:bg-slate-100 hover:text-slate-900",
+                                )}
+                              >
+                                {action.icon ?? (
+                                  <MoreHorizontal className="h-4 w-4" />
+                                )}
+                              </button>
+                            </div>
+                          );
+                        }
+
+                        // Multiple actions -> existing dropdown
+                        return (
+                          <div className="relative flex justify-end">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+
+                                const rect =
+                                  e.currentTarget.getBoundingClientRect();
+
+                                setMenuPosition({
+                                  top: rect.bottom + window.scrollY,
+                                  left: rect.right - 192 + window.scrollX,
+                                });
+
+                                setOpenMenuId(
+                                  openMenuId === rowIdx ? null : rowIdx,
                                 );
-                              })}
-                            </div>,
-                            document.body,
-                          )}
-                      </div>
+                              }}
+                              className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-900 transition-colors"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </button>
+
+                            {openMenuId === rowIdx &&
+                              createPortal(
+                                <div
+                                  ref={menuRef}
+                                  className="fixed w-48 bg-white rounded-xl shadow-xl border border-slate-100 py-1 z-[9999]"
+                                  style={{
+                                    top: menuPosition.top,
+                                    left: menuPosition.left,
+                                  }}
+                                >
+                                  {visibleActions.map((action, actionIdx) => (
+                                    <button
+                                      key={actionIdx}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        action.onClick(item);
+                                        setOpenMenuId(null);
+                                      }}
+                                      className={cn(
+                                        "w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold transition-colors",
+                                        action.variant === "danger"
+                                          ? "text-red-600 hover:bg-red-50"
+                                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
+                                      )}
+                                    >
+                                      {action.icon}
+                                      {typeof action.label === "function"
+                                        ? action.label(item)
+                                        : action.label}
+                                    </button>
+                                  ))}
+                                </div>,
+                                document.body,
+                              )}
+                          </div>
+                        );
+                      })()}
                     </td>
                   )}
                 </tr>
