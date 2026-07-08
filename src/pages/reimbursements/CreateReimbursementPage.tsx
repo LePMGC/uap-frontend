@@ -403,10 +403,6 @@ export default function CreateReimbursementPage() {
           <h1 className="text-xl font-bold tracking-tight text-slate-900">
             Initialize Resource Reimbursement
           </h1>
-          <p className="text-xs text-slate-400 font-medium mt-0.5">
-            Define trouble parameters explicitly and configure dynamic
-            resolution mappings.
-          </p>
         </div>
       </div>
 
@@ -421,7 +417,7 @@ export default function CreateReimbursementPage() {
             <div className="border-b border-slate-100 pb-3 flex items-center gap-2">
               <Ticket className="h-4 w-4 text-indigo-600" />
               <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                1. Trouble Ticket Registry Context
+                1. Registry Context
               </h2>
             </div>
 
@@ -443,7 +439,7 @@ export default function CreateReimbursementPage() {
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-600">
-                  Execution Routing Stream
+                  Execution Mode
                 </label>
                 <div className="grid grid-cols-2 gap-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200">
                   <button
@@ -476,7 +472,7 @@ export default function CreateReimbursementPage() {
 
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-slate-600">
-                Operational Summary Context / Justification Log
+                Description
               </label>
               <textarea
                 rows={2}
@@ -494,7 +490,7 @@ export default function CreateReimbursementPage() {
             <div className="border-b border-slate-100 pb-3 flex items-center gap-2">
               <Layers className="h-4 w-4 text-indigo-600" />
               <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                2. Target Ingestion Distribution Mapping
+                2. Target MSISDN List
               </h2>
             </div>
 
@@ -516,7 +512,7 @@ export default function CreateReimbursementPage() {
                 )}
               >
                 <User className="h-4 w-4" />
-                <span>Single Target User</span>
+                <span>Single Subscriber</span>
                 <span className="text-[9px] text-slate-400 font-medium font-mono">
                   1 MSISDN ➔ 1 Product
                 </span>
@@ -538,7 +534,7 @@ export default function CreateReimbursementPage() {
                 )}
               >
                 <Users className="h-4 w-4" />
-                <span>Batch Group User</span>
+                <span>Batch Group Subscribers</span>
                 <span className="text-[9px] text-slate-400 font-medium font-mono">
                   Many MSISDN ➔ 1 Product
                 </span>
@@ -560,7 +556,7 @@ export default function CreateReimbursementPage() {
                 )}
               >
                 <Layers className="h-4 w-4" />
-                <span>Complex Matrix Ingest</span>
+                <span>Complex Matrix</span>
                 <span className="text-[9px] text-slate-400 font-medium font-mono">
                   Many MSISDN ➔ Varied Rows
                 </span>
@@ -590,12 +586,7 @@ export default function CreateReimbursementPage() {
                   <div className="flex items-center justify-between relative z-40">
                     <div>
                       <span className="text-xs font-bold text-slate-700 block">
-                        Upload Data Source Sheet Matrix
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-medium">
-                        {distributionMode === "MANY_SINGLE"
-                          ? "Provide single column list of valid MSISDN elements."
-                          : "Provide columns matching: msisdn, target_product_id."}
+                        Upload Subscribers List
                       </span>
                     </div>
 
@@ -648,7 +639,7 @@ export default function CreateReimbursementPage() {
             <div className="border-b border-slate-100 pb-3 flex items-center gap-2">
               <Package className="h-4 w-4 text-indigo-600" />
               <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                3. Asset Allocation Engine Mapping
+                3. Reimbursement Asset
               </h2>
             </div>
 
@@ -668,7 +659,7 @@ export default function CreateReimbursementPage() {
               <div className="flex flex-col gap-4 animate-in fade-in duration-200">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-slate-600">
-                    Reimbursement Resource Base Profile
+                    Reimbursement Asset Type
                   </label>
                   <select
                     value={reimbursementType}
@@ -679,12 +670,8 @@ export default function CreateReimbursementPage() {
                     }}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500 cursor-pointer"
                   >
-                    <option value="BUNDLE">
-                      Bundle Provisioning Dynamic Catalog Item
-                    </option>
-                    <option value="AIRTIME">
-                      Airtime Transfer Account Topup Ledger
-                    </option>
+                    <option value="BUNDLE">Bundle Provisioning</option>
+                    <option value="AIRTIME">Airtime Transfer</option>
                   </select>
                 </div>
 
@@ -692,7 +679,7 @@ export default function CreateReimbursementPage() {
                   <div className="grid grid-cols-1 gap-3 border-t border-slate-100 pt-3">
                     <div className="flex flex-col gap-1.5">
                       <label className="text-xs font-bold text-slate-600">
-                        Package Group Category
+                        Bundle Category
                       </label>
                       <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
                         {MOCK_BUNDLE_CATEGORIES.map((cat) => (
@@ -721,7 +708,7 @@ export default function CreateReimbursementPage() {
                       ref={dropdownRef}
                     >
                       <label className="text-xs font-bold text-slate-600">
-                        Select Specific Asset Bundle Mapping
+                        Select Bundle
                       </label>
                       <div
                         onClick={() => setIsSearchOpen(!isSearchOpen)}
@@ -743,7 +730,7 @@ export default function CreateReimbursementPage() {
                             <Search className="absolute left-2.5 h-3.5 w-3.5 text-slate-400" />
                             <input
                               type="text"
-                              placeholder="Search package listings by token tag or cost parameters..."
+                              placeholder="Search bundle by id, price or name"
                               value={searchQuery}
                               onChange={(e) => setSearchQuery(e.target.value)}
                               className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-800 outline-none focus:border-indigo-500 font-medium"
@@ -786,7 +773,7 @@ export default function CreateReimbursementPage() {
                 ) : (
                   <div className="flex flex-col gap-1.5 border-t border-slate-100 pt-3">
                     <label className="text-xs font-bold text-slate-600">
-                      Airtime Cash Value Topup Amount (CFA)
+                      Airtime Cash Value
                     </label>
                     <div className="relative">
                       <Coins className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -811,7 +798,7 @@ export default function CreateReimbursementPage() {
             <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
               <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
                 <Paperclip className="h-4 w-4 text-indigo-600" />
-                4. Operational Evidence Attachments
+                4. Evidence Attachments
               </h2>
               <label className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors shadow-sm">
                 Add Evidence
@@ -826,9 +813,8 @@ export default function CreateReimbursementPage() {
 
             {attachments.length === 0 ? (
               <div className="border border-dashed border-slate-200 rounded-xl p-6 text-center text-slate-400 text-xs font-medium bg-slate-50/50">
-                No procedural evidence vouchers or receipts appended. Add
-                configuration receipts to facilitate clear checker validation
-                workflows.
+                No evidence attachments uploaded yet. Click "Add Evidence" to
+                upload supporting files.
               </div>
             ) : (
               <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto">
@@ -884,7 +870,7 @@ export default function CreateReimbursementPage() {
               }
               className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md disabled:bg-slate-200 transition-all active:scale-95"
             >
-              {isSubmitting ? "Queueing Entries..." : "Commit Asset Correction"}
+              {isSubmitting ? "Queueing Entries..." : "Commit Reimbursement"}
             </button>
           </div>
         </div>

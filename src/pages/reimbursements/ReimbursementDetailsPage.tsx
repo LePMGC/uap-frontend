@@ -605,35 +605,36 @@ export default function ReimbursementDetailsPage() {
         <div className="flex flex-wrap items-center gap-2">
           {record.status === "pending" && (
             <>
-              {canApproveReject && (
-                <div className="flex items-center gap-2 border-r pr-2 mr-1 border-slate-200">
-                  <button
-                    type="button"
-                    disabled={isActioning}
-                    onClick={() => setIsRejectModalOpen(true)}
-                    className="h-9 px-3.5 rounded-xl border border-rose-200 bg-rose-50/50 text-rose-700 font-bold text-xs hover:bg-rose-100/60 flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
-                  >
-                    <ThumbsDown className="h-3.5 w-3.5" /> Reject
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isActioning}
-                    onClick={() => setIsApproveModalOpen(true)}
-                    className="h-9 px-4 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
-                  >
-                    <ThumbsUp className="h-3.5 w-3.5" /> Approve Context
-                  </button>
-                </div>
-              )}
+              {canApproveReject &&
+                record.capabilities?.can_approve === true && (
+                  <div className="flex items-center gap-2 border-r pr-2 mr-1 border-slate-200">
+                    <button
+                      type="button"
+                      disabled={isActioning}
+                      onClick={() => setIsRejectModalOpen(true)}
+                      className="h-9 px-3.5 rounded-xl border border-rose-200 bg-rose-50/50 text-rose-700 font-bold text-xs hover:bg-rose-100/60 flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
+                    >
+                      <ThumbsDown className="h-3.5 w-3.5" /> Reject
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isActioning}
+                      onClick={() => setIsApproveModalOpen(true)}
+                      className="h-9 px-4 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
+                    >
+                      <ThumbsUp className="h-3.5 w-3.5" /> Approve
+                    </button>
+                  </div>
+                )}
 
-              {canCancel && (
+              {record.capabilities?.can_cancel === true && (
                 <button
                   type="button"
                   disabled={isActioning}
                   onClick={() => setIsCancelModalOpen(true)}
                   className="h-9 px-3.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
                 >
-                  <Ban className="h-3.5 w-3.5 text-slate-400" /> Cancel Request
+                  <Ban className="h-3.5 w-3.5 text-slate-400" /> Cancel
                 </button>
               )}
             </>
@@ -873,8 +874,8 @@ export default function ReimbursementDetailsPage() {
             {/* Target Allocations Configuration Options */}
             <div className="flex flex-col gap-1 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs">
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                <Package className="h-3 w-3 text-indigo-500" /> Asset Targeted
-                Metrics Selection
+                <Package className="h-3 w-3 text-indigo-500" /> Bundle / Airtime
+                Value
               </span>
 
               {isEditing ? (
@@ -995,8 +996,8 @@ export default function ReimbursementDetailsPage() {
 
             <div className="flex flex-col gap-1.5 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs">
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                <FileText className="h-3 w-3 text-indigo-500" /> Business
-                Justification & Notes
+                <FileText className="h-3 w-3 text-indigo-500" /> Reimbursement
+                Description
               </span>
               {isEditing ? (
                 <textarea
@@ -1019,7 +1020,7 @@ export default function ReimbursementDetailsPage() {
               <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
                 <Layers className="h-4 w-4 text-indigo-600" />
                 <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                  Bulk Ledger Distribution Source Management
+                  Target Subscribers List
                 </h3>
               </div>
 
@@ -1027,7 +1028,7 @@ export default function ReimbursementDetailsPage() {
               <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 bg-slate-50/70 border border-slate-200/60 rounded-xl p-3">
                 <div className="text-xs space-y-1">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                    Active Ledger Token Reference
+                    List File Reference ID
                   </span>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-mono font-bold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-sm">
@@ -1083,33 +1084,117 @@ export default function ReimbursementDetailsPage() {
 
         {/* Sidebar Grid */}
         <div className="lg:col-span-4 flex flex-col gap-6">
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm flex flex-col gap-3.5">
-            <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest border-b border-slate-50 pb-2">
-              Workflow Status Tracks
-            </h2>
-            {getStatusBadge(record.status)}
+          {/* WORKFLOW TRACKS CARD */}
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm flex flex-col gap-4">
+            <div className="flex justify-between items-center border-b border-slate-50 pb-2.5">
+              <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest">
+                Workflow Status Tracks
+              </h2>
+              {getStatusBadge(record.status)}
+            </div>
 
-            <div className="flex flex-col gap-2.5 text-[11px] font-medium text-slate-500 border-t border-slate-100 pt-3">
-              <div className="flex justify-between items-center">
-                <span className="text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                  <User className="h-3 w-3" /> Requested By:
+            {/* VISUAL 2-STEP WORKFLOW TIMELINE */}
+            <div className="relative pl-6 space-y-6 before:absolute before:bottom-2 before:top-2 before:left-[7px] before:w-[2px] before:bg-slate-100">
+              {/* STEP 1: SUBMISSION (ALWAYS SUCCESS / COMPLETED) */}
+              <div className="relative">
+                {/* Step Indicator Node */}
+                <span className="absolute -left-[23px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 ring-4 ring-white">
+                  <CheckCircle2 className="h-2.5 w-2.5 text-white" />
                 </span>
-                <span className="font-bold text-slate-700 font-mono">
-                  {record.requester_name ||
-                    `User ID #${record.requested_by_user_id}`}
-                </span>
+
+                <div>
+                  <h4 className="text-[11px] font-bold text-slate-800 uppercase tracking-tight">
+                    Step 1: Request Initialization
+                  </h4>
+                  <div className="mt-1.5 p-2.5 rounded-xl bg-slate-50 border border-slate-100/70 text-[10px] font-medium text-slate-500 space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 font-bold flex items-center gap-1 uppercase tracking-wider">
+                        <User className="h-2.5 w-2.5" /> Requester
+                      </span>
+                      <span className="font-bold text-slate-700 font-mono">
+                        {record.requester_name ||
+                          `User ID #${record.requested_by_user_id}`}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 font-bold flex items-center gap-1 uppercase tracking-wider">
+                        <Clock className="h-2.5 w-2.5" /> Registered
+                      </span>
+                      <span className="font-bold text-slate-600">
+                        {new Date(record.created_at).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                  <Clock className="h-3 w-3" /> Registered On:
-                </span>
-                <span className="font-bold text-slate-700">
-                  {new Date(record.created_at).toLocaleString()}
-                </span>
+
+              {/* STEP 2: REVIEW CYCLE */}
+              <div className="relative">
+                {/* Dynamic Step Indicator Node */}
+                {record.status === "approved" ? (
+                  <span className="absolute -left-[23px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 ring-4 ring-white">
+                    <CheckCircle2 className="h-2.5 w-2.5 text-white" />
+                  </span>
+                ) : record.status === "rejected" ? (
+                  <span className="absolute -left-[23px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 ring-4 ring-white">
+                    <XCircle className="h-2.5 w-2.5 text-white" />
+                  </span>
+                ) : (
+                  <span className="absolute -left-[23px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 ring-4 ring-white animate-pulse">
+                    <Clock className="h-2.5 w-2.5 text-white" />
+                  </span>
+                )}
+
+                <div>
+                  <h4 className="text-[11px] font-bold text-slate-800 uppercase tracking-tight">
+                    Step 2: Operational Governance Review
+                  </h4>
+
+                  {record.status === "approved" ||
+                  record.status === "rejected" ? (
+                    <div
+                      className={cn(
+                        "mt-1.5 p-2.5 rounded-xl border text-[10px] font-medium space-y-1",
+                        record.status === "approved"
+                          ? "bg-indigo-50/40 border-indigo-100/70"
+                          : "bg-rose-50/40 border-rose-100/70",
+                      )}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400 font-bold flex items-center gap-1 uppercase tracking-wider">
+                          <User className="h-2.5 w-2.5" /> Reviewed By
+                        </span>
+                        <span className="font-bold text-slate-700 font-mono">
+                          {record.reviewer_name ||
+                            `User ID #${record.reviewed_by_user_id ?? "N/A"}`}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400 font-bold flex items-center gap-1 uppercase tracking-wider">
+                          <Clock className="h-2.5 w-2.5" /> Processed On
+                        </span>
+                        <span className="font-bold text-slate-600">
+                          {record.reviewed_at
+                            ? new Date(record.reviewed_at).toLocaleString()
+                            : "—"}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-1.5 p-3 rounded-xl bg-amber-50/40 border border-amber-100/50 text-[10px] font-semibold text-amber-800 flex items-center gap-2">
+                      <Clock
+                        className="h-3 w-3 text-amber-600 shrink-0 animate-spin"
+                        style={{ animationDuration: "3s" }}
+                      />
+                      Awaiting administration decision matrix review parameters.
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
+          {/* EVIDENCE DOCUMENTS CARD */}
           <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm flex flex-col gap-3">
             <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest border-b border-slate-50 pb-2">
               Evidence Documents ({attachments.length})

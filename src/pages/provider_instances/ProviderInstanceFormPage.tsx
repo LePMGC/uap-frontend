@@ -201,7 +201,7 @@ export default function ProviderInstanceFormPage() {
                     <option value="">Select Category</option>
                     <option value="ericsson-ucip">Ericsson UCIP</option>
                     <option value="ericsson-cai">Ericsson CAI</option>
-                    <option value="leap">LEAP REST API</option>
+                    <option value="conviva-leap">LEAP REST API</option>
                     <option value="smsc">SMSC (SMPP)</option>
                   </select>
                 </div>

@@ -35,6 +35,8 @@ const menuGroups = [
       PERM.VIEW_OWN_BATCH_INSTANCES,
       PERM.VIEW_ALL_BATCH_INSTANCES,
       PERM.VIEW_TRACE_TIMELINE,
+      PERM.VIEW_ALL_REIMBURSEMENTS,
+      PERM.VIEW_OWN_REIMBURSEMENTS,
     ],
     items: [
       // Dashboard is usually open to anyone who has access to general operations
@@ -48,7 +50,8 @@ const menuGroups = [
         name: "Reimbursements",
         icon: ReceiptEuro,
         url: "/reimbursements",
-        requiredPermission: PERM.EXECUTE_COMMANDS,
+        requiredPermission:
+          PERM.VIEW_OWN_REIMBURSEMENTS || PERM.VIEW_ALL_REIMBURSEMENTS,
       },
       {
         name: "Single Execution",

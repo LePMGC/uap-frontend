@@ -19,6 +19,7 @@ export function ProviderInstanceForm({
     if (!settings.port) {
       if (category === "ericsson-ucip") updateField("port", 10011);
       if (category === "ericsson-cai") updateField("port", 3300);
+      if (category === "conviva-leap") updateField("port", 9002);
     }
   }, [category]);
 
@@ -130,63 +131,19 @@ export function ProviderInstanceForm({
 
   // --- LEAP (REST API Based) View ---
   // Note: Standardized to use Host (URL), Username, and Password (Token)
-  if (category === "leap") {
+  if (category === "conviva-leap") {
     return (
       <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
-        <div className="col-span-2">
-          <MandatoryLabel>API Base Endpoint (Host)</MandatoryLabel>
+        {renderNetworkFields()}
+        <div className="col-span-1">
+          <MandatoryLabel>Base URL</MandatoryLabel>
           <input
             required
-            value={settings.host || ""}
-            onChange={(e) => updateField("host", e.target.value)}
-            className="w-full mt-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold outline-none focus:bg-white"
-            placeholder="https://leap-service.internal/api/v1"
-          />
-        </div>
-        {/* New TPS Limit Field */}
-        <div className="col-span-2">
-          <MandatoryLabel>TPS Limit (Transactions Per Second)</MandatoryLabel>
-          <input
-            required
-            type="number"
-            min="1"
-            value={settings.tps_limit || ""}
-            onChange={(e) => updateField("tps_limit", e.target.value)}
-            className="w-full mt-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold focus:bg-white outline-none"
-            placeholder="e.g. 10"
-          />
-        </div>
-        <div>
-          <MandatoryLabel>App ID / Username</MandatoryLabel>
-          <input
-            required
-            value={settings.username || ""}
-            onChange={(e) => updateField("username", e.target.value)}
+            value={settings.base_url || ""}
+            onChange={(e) => updateField("base_url", e.target.value)}
             className="w-full mt-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:bg-white"
+            placeholder="e.g. 1234"
           />
-        </div>
-        <div>
-          <MandatoryLabel>API Token / Password</MandatoryLabel>
-          <div className="relative">
-            <input
-              required
-              type={showPass ? "text" : "password"}
-              value={settings.password || ""}
-              onChange={(e) => updateField("password", e.target.value)}
-              className="w-full mt-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-mono outline-none focus:bg-white"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPass(!showPass)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
-            >
-              {showPass ? (
-                <EyeOff className="h-4 w-4" />
-              ) : (
-                <Eye className="h-4 w-4" />
-              )}
-            </button>
-          </div>
         </div>
       </div>
     );

@@ -50,10 +50,19 @@ export default function ReimbursementsPage() {
   const [typeFilter, setTypeFilter] = useState("");
   const [tierFilter, setTierFilter] = useState("");
   const [modeFilter, setModeFilter] = useState("");
+  const [createdByFilter, setCreatedByFilter] = useState<string>("");
+  const [reviewedByFilter, setReviewedByFilter] = useState<string>("");
 
   // Creation Date Range Filter Boundaries
   const [createdAtStart, setCreatedAtStart] = useState("");
   const [createdAtEnd, setCreatedAtEnd] = useState("");
+  const [requesters, setRequesters] = useState<{ id: number; name: string }[]>(
+    [],
+  );
+
+  const [reviewers, setReviewers] = useState<{ id: number; name: string }[]>(
+    [],
+  );
 
   const [pagination, setPagination] = useState({
     current_page: 1,
@@ -86,14 +95,16 @@ export default function ReimbursementsPage() {
         reimbursement_type: (typeFilter as any) || undefined,
         required_tier: tierFilter ? Number(tierFilter) : undefined,
         reimbursement_mode: (modeFilter as any) || undefined,
+        created_by: createdByFilter || undefined,
+        reviewed_by: reviewedByFilter || undefined,
         created_at_start: createdAtStart || undefined,
         created_at_end: createdAtEnd || undefined,
       };
 
       // If search query looks like an exact MSISDN, feed it into the structured parameter field
-      if (/^\d+$/.test(searchQuery)) {
+      /* if (/^\d+$/.test(searchQuery)) {
         filters.msisdn = searchQuery;
-      }
+      } */
 
       const response = await reimbursementsService.getReimbursements(
         pagination.current_page,
@@ -145,6 +156,8 @@ export default function ReimbursementsPage() {
     typeFilter,
     tierFilter,
     modeFilter,
+    createdByFilter,
+    reviewedByFilter,
     createdAtStart,
     createdAtEnd,
     showToast,
@@ -155,6 +168,25 @@ export default function ReimbursementsPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Fetch Filters
+  useEffect(() => {
+    const loadFilters = async () => {
+      try {
+        const [creatorsRes, reviewersRes] = await Promise.all([
+          reimbursementsService.getCreators(),
+          reimbursementsService.getReviewers(),
+        ]);
+
+        setRequesters(creatorsRes.data);
+        setReviewers(reviewersRes.data);
+      } catch (error) {
+        console.error("Failed loading reimbursement filters", error);
+      }
+    };
+
+    loadFilters();
+  }, []);
 
   // --- TABLE COLUMN CONFIGURATION ---
   const columns = [
@@ -195,7 +227,7 @@ export default function ReimbursementsPage() {
       ),
     },
     {
-      header: "Asset & Processing Mode",
+      header: "Bundle / Airtime",
       accessor: (item: any) => (
         <div className="space-y-1.5">
           <span className="block text-xs font-medium text-slate-600">
@@ -216,22 +248,6 @@ export default function ReimbursementsPage() {
             )}
             {item.reimbursement_mode || "AUTO"}
           </span>
-        </div>
-      ),
-    },
-    {
-      header: "Approval Structure",
-      accessor: (item: any) => (
-        <div className="space-y-1">
-          <span className="block text-[10px] font-black uppercase px-1.5 py-0.5 rounded border bg-slate-50 text-slate-500 border-slate-100 w-fit">
-            Tier {item.required_tier || "1"} Approval
-          </span>
-          {item.attachments?.length > 0 && (
-            <div className="flex items-center gap-1 text-slate-400 text-[11px]">
-              <Paperclip className="h-3 w-3" />
-              <span>{item.attachments.length} attachment(s)</span>
-            </div>
-          )}
         </div>
       ),
     },
@@ -277,6 +293,14 @@ export default function ReimbursementsPage() {
                 minute: "2-digit",
               })
             : "---"}
+        </span>
+      ),
+    },
+    {
+      header: "Requested By",
+      accessor: (item: any) => (
+        <span className="text-xs text-slate-600 font-medium">
+          {item.requester_name || "---"}
         </span>
       ),
     },
@@ -380,14 +404,14 @@ export default function ReimbursementsPage() {
 
       {/* COMPONENT INVOCATION LINKED TO ALL MULTI-SELECT FILTER CONFIGS */}
       <GenericDataTable
-        title="Reimbursement Ledgers"
-        subtitle="Track, audit, and approve single and bulk subscriber resource provisioning modifications."
+        title="Reimbursements"
+        subtitle=""
         data={data}
         columns={columns}
         actions={actions}
         pagination={pagination}
         searchPlaceholder="Search by Ticket ID or MSISDN..."
-        searchWidth="w-full md:w-64" // Give the search bar a defined desktop space so filters can sit cleanly next to it
+        searchWidth="w-full md:w-64"
         onSearchChange={(val) => {
           setSearchQuery(val);
           setPagination((prev) => ({ ...prev, current_page: 1 }));
@@ -438,19 +462,38 @@ export default function ReimbursementsPage() {
               <option value="BUNDLE">Data/Bundle Packages</option>
             </select>
 
-            {/* TIER */}
+            {/* CREATED BY */}
             <select
-              value={tierFilter}
+              value={createdByFilter}
               onChange={(e) => {
-                setTierFilter(e.target.value);
+                setCreatedByFilter(e.target.value);
                 setPagination((p) => ({ ...p, current_page: 1 }));
               }}
               className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 outline-none hover:border-slate-300 transition-colors cursor-pointer h-9"
             >
-              <option value="">All Approval Tiers</option>
-              <option value="1">Tier 1 Clearance</option>
-              <option value="2">Tier 2 Clearance</option>
-              <option value="3">Tier 3 Clearance</option>
+              <option value="">All Requesters</option>
+              {requesters.map((requester) => (
+                <option key={requester.id} value={requester.id}>
+                  {requester.name}
+                </option>
+              ))}
+            </select>
+
+            {/* REVIEWED BY */}
+            <select
+              value={reviewedByFilter}
+              onChange={(e) => {
+                setReviewedByFilter(e.target.value);
+                setPagination((p) => ({ ...p, current_page: 1 }));
+              }}
+              className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 outline-none hover:border-slate-300 transition-colors cursor-pointer h-9"
+            >
+              <option value="">All Reviewers</option>
+              {reviewers.map((reviewer) => (
+                <option key={reviewer.id} value={reviewer.id}>
+                  {reviewer.name}
+                </option>
+              ))}
             </select>
 
             {/* MODE */}

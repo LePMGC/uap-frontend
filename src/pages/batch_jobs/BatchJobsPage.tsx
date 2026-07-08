@@ -379,7 +379,7 @@ export default function BatchJobsPage() {
         ].map((stat, i) => (
           <div
             key={i}
-            className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-indigo-100 transition-colors"
+            className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3 hover:border-indigo-100 transition-colors"
           >
             <div className={cn("p-3 rounded-xl", stat.bg)}>
               <stat.icon className={cn("h-5 w-5", stat.color, stat.rotate)} />
@@ -420,6 +420,7 @@ export default function BatchJobsPage() {
         }}
         showAdd={canCreateJobs}
         onAddClick={() => navigate("/batch-jobs/create")}
+        searchWidth="w-full md:w-64"
       />
     </div>
   );

@@ -12,9 +12,11 @@ export interface ReimbursementFilters {
   required_tier?: number;
   requested_by_user_id?: string | number;
   approved_by_user_id?: string | number;
-  created_at_start?: string; // ISO Date filter boundaries
+  created_at_start?: string;
   created_at_end?: string;
   reimbursement_mode: "AUTO" | "MANUAL";
+  created_by: string | undefined;
+  reviewed_by: string | undefined;
 }
 
 export interface ReimbursementAttachment {
@@ -39,7 +41,9 @@ export interface ReimbursementItem {
   rejection_reason?: string;
   attachments: ReimbursementAttachment[];
   requested_by_user_id: string | number;
-  approved_by_user_id?: string | number | null;
+  reviewed_by_user_id?: string | number | null;
+  reviewer_name?: string | null;
+  reviewed_at?: string | null;
   created_at: string;
   input_file_url: string | null;
   is_bulk: boolean;
@@ -48,6 +52,7 @@ export interface ReimbursementItem {
   // ADD THESE TWO LINES TO FIX THE COMPILATION COMPLAINT:
   requester_name?: string | null;
   approver_name?: string | null;
+  capabilities: { can_approve: boolean; can_cancel: boolean };
 }
 
 export interface ReimbursementStats {
@@ -204,7 +209,7 @@ export const reimbursementsService = {
       const response = await api.post(
         `/operations/reimbursements/${id}/reject`,
         {
-          reason: rejectionReason,
+          rejection_reason: rejectionReason,
         },
       );
       return response.data;
@@ -431,5 +436,17 @@ export const reimbursementsService = {
       console.error("reimbursementsService.downloadInputFile failed:", error);
       throw error;
     }
+  },
+
+  getCreators: async () => {
+    const response = await api.get("/operations/reimbursements/creators");
+
+    return response.data;
+  },
+
+  getReviewers: async () => {
+    const response = await api.get("/operations/reimbursements/reviewers");
+
+    return response.data;
   },
 };
