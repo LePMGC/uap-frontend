@@ -11,10 +11,14 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createPortal } from "react-dom";
-import { useAuthStore } from "@/store/authStore"; // Import auth state manager
+import { useAuthStore } from "@/store/authStore";
+import { Filter, ChevronUp } from "lucide-react";
 
 export interface FilterConfig {
-  id?: string;
+  id: string;
+
+  // Name shown in the Filters dropdown
+  menuLabel?: string;
 
   // Existing dropdown props
   label?: string;
@@ -22,8 +26,13 @@ export interface FilterConfig {
   options?: { label: string; value: string }[];
   onChange?: (value: string) => void;
 
-  // New optional custom filter
   custom?: React.ReactNode;
+}
+
+export interface FilterContentItem {
+  id: string;
+  label: string;
+  element: React.ReactNode;
 }
 
 export interface Column<T> {
@@ -71,7 +80,7 @@ interface GenericDataTableProps<T> {
   showAdd?: boolean;
   showExport?: boolean;
   titleSize?: string;
-  filterContent?: React.ReactNode;
+  filterContent?: FilterContentItem[];
   searchWidth?: string;
 }
 
@@ -100,17 +109,45 @@ export function GenericDataTable<T>({
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false);
+  const filterMenuRef = useRef<HTMLDivElement>(null);
+
+  const filterKeys = filters.map(
+    (filter, index) => filter.id || filter.label || `filter-${index}`,
+  );
+  const [visibleFilters, setVisibleFilters] = useState<string[]>([]);
+  const filterContentKeys = (filterContent ?? []).map((f) => f.id);
+  const allFilterKeys = [...filterKeys, ...filterContentKeys];
 
   // Pull active user authority configurations directly inside the loop
   const userPermissions = useAuthStore(
     (state) => state.user?.permissions || [],
   );
 
+  useEffect(() => {
+    setVisibleFilters((current) => {
+      // First load: hide everything
+      if (current.length === 0) {
+        return [];
+      }
+
+      // Keep only filters that still exist
+      return current.filter((k) => allFilterKeys.includes(k));
+    });
+  }, [filters, filterContent]);
+
   // Sync menu state out when interacting with background layers
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setOpenMenuId(null);
+      }
+
+      if (
+        filterMenuRef.current &&
+        !filterMenuRef.current.contains(event.target as Node)
+      ) {
+        setFilterMenuOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -130,6 +167,7 @@ export function GenericDataTable<T>({
     (!addPermission || userPermissions.includes(addPermission));
 
   const hasActions = allowedActions.length > 0;
+  const hasFilters = allFilterKeys.length > 0;
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-visible">
@@ -164,38 +202,141 @@ export function GenericDataTable<T>({
             />
           </div>
 
-          {/* Filters wrapping neatly into 1-2 lines */}
+          {/* Filters Panel */}
           <div className="flex flex-wrap items-center gap-2 w-full">
             {filters.map((filter, index) => {
+              const key = filter.id || filter.label || `filter-${index}`;
+
+              if (!visibleFilters.includes(key)) {
+                return null;
+              }
+
               if (filter.custom) {
-                return <div key={filter.id ?? index}>{filter.custom}</div>;
+                return <div key={key}>{filter.custom}</div>;
               }
 
               return (
-                <div key={filter.id ?? index} className="relative shrink-0">
+                <div key={key} className="relative shrink-0">
                   <select
                     value={filter.value ?? ""}
                     onChange={(e) => filter.onChange?.(e.target.value)}
-                    className="bg-white border border-slate-200 rounded-lg pl-3 pr-8 py-1.5 text-[11px] font-bold text-slate-600 outline-none hover:border-slate-300 transition-colors appearance-none cursor-pointer h-9"
+                    className="bg-white border border-slate-200 rounded-lg pl-3 pr-8 py-1.5 text-[11px] font-bold text-slate-600 outline-none hover:border-slate-300 focus:ring-2 focus:ring-indigo-500/10 appearance-none h-9"
                   >
                     <option value="">{filter.label}</option>
+
                     {filter.options?.map((opt) => (
                       <option key={opt.value} value={opt.value}>
                         {opt.label}
                       </option>
                     ))}
                   </select>
+
                   <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400 pointer-events-none" />
                 </div>
               );
             })}
+            {filterContent?.map((item) => (
+              <label
+                key={item.id}
+                className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-slate-50 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={visibleFilters.includes(item.id)}
+                  onChange={() =>
+                    setVisibleFilters((prev) =>
+                      prev.includes(item.id)
+                        ? prev.filter((x) => x !== item.id)
+                        : [...prev, item.id],
+                    )
+                  }
+                />
 
-            {filterContent}
+                <span className="text-xs text-slate-700">{item.label}</span>
+              </label>
+            ))}
+
+            {filterContent
+              ?.filter((item) => visibleFilters.includes(item.id))
+              .map((item) => (
+                <React.Fragment key={item.id}>{item.element}</React.Fragment>
+              ))}
           </div>
         </div>
 
         {/* Right Action Column: CTA Buttons */}
         <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+          {hasFilters && (
+            <div className="relative" ref={filterMenuRef}>
+              <button
+                onClick={() => setFilterMenuOpen((p) => !p)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 rounded-lg font-bold text-[11px] hover:bg-slate-50 transition-all shadow-sm h-9"
+              >
+                <Filter className="h-3.5 w-3.5" />
+                Filters
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+
+              {filterMenuOpen && (
+                <div className="absolute right-0 mt-2 w-64 rounded-xl border border-slate-200 bg-white shadow-xl z-50 p-2">
+                  <div className="px-2 pb-2 mb-2 border-b text-xs font-semibold text-slate-500">
+                    Visible Filters
+                  </div>
+
+                  {[
+                    ...filters.map((filter) => ({
+                      id: filter.id,
+                      label: filter.menuLabel ?? filter.label ?? filter.id,
+                    })),
+                    ...(filterContent ?? []).map((item) => ({
+                      id: item.id,
+                      label: item.label,
+                    })),
+                  ].map((filter) => (
+                    <label
+                      key={filter.id}
+                      className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-slate-50 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={visibleFilters.includes(filter.id)}
+                        onChange={() => {
+                          setVisibleFilters((prev) =>
+                            prev.includes(filter.id)
+                              ? prev.filter((x) => x !== filter.id)
+                              : [...prev, filter.id],
+                          );
+                        }}
+                      />
+
+                      <span className="text-xs text-slate-700">
+                        {filter.label}
+                      </span>
+                    </label>
+                  ))}
+
+                  {allFilterKeys.length > 1 && (
+                    <div className="mt-3 pt-2 border-t flex gap-2">
+                      <button
+                        className="flex-1 rounded-md border px-2 py-1 text-xs hover:bg-slate-50"
+                        onClick={() => setVisibleFilters(allFilterKeys)}
+                      >
+                        Show All
+                      </button>
+
+                      <button
+                        className="flex-1 rounded-md border px-2 py-1 text-xs hover:bg-slate-50"
+                        onClick={() => setVisibleFilters([])}
+                      >
+                        Hide All
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {showExport && onExportClick && (
             <button
               onClick={onExportClick}

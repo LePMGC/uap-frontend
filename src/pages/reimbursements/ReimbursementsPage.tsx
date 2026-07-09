@@ -165,6 +165,140 @@ export default function ReimbursementsPage() {
     canViewOwn,
   ]);
 
+  const tableFilters = [
+    {
+      id: "status",
+      custom: (
+        <select
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setPagination((p) => ({ ...p, current_page: 1 }));
+          }}
+          className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 h-9"
+        >
+          <option value="">All Statuses</option>
+          <option value="pending">Pending Approval</option>
+          <option value="approved">Approved Queue</option>
+          <option value="success">Provisioned Successfully</option>
+          <option value="rejected">Rejected Requests</option>
+          <option value="failed">System Failed</option>
+        </select>
+      ),
+    },
+
+    {
+      id: "type",
+      custom: (
+        <select
+          value={typeFilter}
+          onChange={(e) => {
+            setTypeFilter(e.target.value);
+            setPagination((p) => ({ ...p, current_page: 1 }));
+          }}
+          className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 h-9"
+        >
+          <option value="">All Resource Types</option>
+          <option value="AIRTIME">Airtime Topups</option>
+          <option value="BUNDLE">Data/Bundle Packages</option>
+        </select>
+      ),
+    },
+
+    {
+      id: "creator",
+      custom: (
+        <select
+          value={createdByFilter}
+          onChange={(e) => {
+            setCreatedByFilter(e.target.value);
+            setPagination((p) => ({ ...p, current_page: 1 }));
+          }}
+          className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 h-9"
+        >
+          <option value="">All Requesters</option>
+
+          {requesters.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.name}
+            </option>
+          ))}
+        </select>
+      ),
+    },
+
+    {
+      id: "reviewer",
+      custom: (
+        <select
+          value={reviewedByFilter}
+          onChange={(e) => {
+            setReviewedByFilter(e.target.value);
+            setPagination((p) => ({ ...p, current_page: 1 }));
+          }}
+          className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 h-9"
+        >
+          <option value="">All Reviewers</option>
+
+          {reviewers.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.name}
+            </option>
+          ))}
+        </select>
+      ),
+    },
+
+    {
+      id: "mode",
+      custom: (
+        <select
+          value={modeFilter}
+          onChange={(e) => {
+            setModeFilter(e.target.value);
+            setPagination((p) => ({ ...p, current_page: 1 }));
+          }}
+          className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 h-9"
+        >
+          <option value="">All Execution Modes</option>
+          <option value="AUTO">Automated (AUTO)</option>
+          <option value="MANUAL">Manual Processing</option>
+        </select>
+      ),
+    },
+
+    {
+      id: "date-range",
+      custom: (
+        <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 h-9">
+          <Calendar className="h-3 w-3 text-slate-400 mr-1" />
+
+          <input
+            type="date"
+            value={createdAtStart}
+            onChange={(e) => {
+              setCreatedAtStart(e.target.value);
+              setPagination((p) => ({ ...p, current_page: 1 }));
+            }}
+            className="bg-transparent text-[11px] outline-none"
+          />
+
+          <span className="text-[10px]">to</span>
+
+          <input
+            type="date"
+            value={createdAtEnd}
+            onChange={(e) => {
+              setCreatedAtEnd(e.target.value);
+              setPagination((p) => ({ ...p, current_page: 1 }));
+            }}
+            className="bg-transparent text-[11px] outline-none"
+          />
+        </div>
+      ),
+    },
+  ];
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
@@ -405,22 +539,28 @@ export default function ReimbursementsPage() {
       {/* COMPONENT INVOCATION LINKED TO ALL MULTI-SELECT FILTER CONFIGS */}
       <GenericDataTable
         title="Reimbursements"
-        subtitle=""
         data={data}
         columns={columns}
         actions={actions}
+        filters={tableFilters}
         pagination={pagination}
         searchPlaceholder="Search by Ticket ID or MSISDN..."
         searchWidth="w-full md:w-64"
         onSearchChange={(val) => {
           setSearchQuery(val);
-          setPagination((prev) => ({ ...prev, current_page: 1 }));
+          setPagination((prev) => ({
+            ...prev,
+            current_page: 1,
+          }));
         }}
         isLoading={loading}
         showAdd={canCreateReimbursement}
         onAddClick={() => navigate("/reimbursements/create")}
         onPageChange={(page) =>
-          setPagination((prev) => ({ ...prev, current_page: page }))
+          setPagination((prev) => ({
+            ...prev,
+            current_page: page,
+          }))
         }
         onPageSizeChange={(size) =>
           setPagination((prev) => ({
@@ -428,128 +568,6 @@ export default function ReimbursementsPage() {
             per_page: size,
             current_page: 1,
           }))
-        }
-        filterContent={
-          <div className="flex flex-wrap items-center gap-2">
-            {/* STATUS */}
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setPagination((p) => ({ ...p, current_page: 1 }));
-              }}
-              className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 outline-none hover:border-slate-300 transition-colors cursor-pointer h-9"
-            >
-              <option value="">All Statuses</option>
-              <option value="pending">Pending Approval</option>
-              <option value="approved">Approved Queue</option>
-              <option value="success">Provisioned Successfully</option>
-              <option value="rejected">Rejected Requests</option>
-              <option value="failed">System Failed</option>
-            </select>
-
-            {/* TYPE */}
-            <select
-              value={typeFilter}
-              onChange={(e) => {
-                setTypeFilter(e.target.value);
-                setPagination((p) => ({ ...p, current_page: 1 }));
-              }}
-              className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 outline-none hover:border-slate-300 transition-colors cursor-pointer h-9"
-            >
-              <option value="">All Resource Types</option>
-              <option value="AIRTIME">Airtime Topups</option>
-              <option value="BUNDLE">Data/Bundle Packages</option>
-            </select>
-
-            {/* CREATED BY */}
-            <select
-              value={createdByFilter}
-              onChange={(e) => {
-                setCreatedByFilter(e.target.value);
-                setPagination((p) => ({ ...p, current_page: 1 }));
-              }}
-              className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 outline-none hover:border-slate-300 transition-colors cursor-pointer h-9"
-            >
-              <option value="">All Requesters</option>
-              {requesters.map((requester) => (
-                <option key={requester.id} value={requester.id}>
-                  {requester.name}
-                </option>
-              ))}
-            </select>
-
-            {/* REVIEWED BY */}
-            <select
-              value={reviewedByFilter}
-              onChange={(e) => {
-                setReviewedByFilter(e.target.value);
-                setPagination((p) => ({ ...p, current_page: 1 }));
-              }}
-              className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 outline-none hover:border-slate-300 transition-colors cursor-pointer h-9"
-            >
-              <option value="">All Reviewers</option>
-              {reviewers.map((reviewer) => (
-                <option key={reviewer.id} value={reviewer.id}>
-                  {reviewer.name}
-                </option>
-              ))}
-            </select>
-
-            {/* MODE */}
-            <select
-              value={modeFilter}
-              onChange={(e) => {
-                setModeFilter(e.target.value);
-                setPagination((p) => ({ ...p, current_page: 1 }));
-              }}
-              className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 outline-none hover:border-slate-300 transition-colors cursor-pointer h-9"
-            >
-              <option value="">All Execution Modes</option>
-              <option value="AUTO">Automated (AUTO)</option>
-              <option value="MANUAL">Manual Processing</option>
-            </select>
-
-            {/* DATE RANGE CONTROLS */}
-            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 h-9">
-              <Calendar className="h-3 w-3 text-slate-400 mr-1" />
-              <input
-                type="date"
-                value={createdAtStart}
-                onChange={(e) => {
-                  setCreatedAtStart(e.target.value);
-                  setPagination((p) => ({ ...p, current_page: 1 }));
-                }}
-                className="bg-transparent text-[11px] font-medium text-slate-600 outline-none cursor-pointer"
-              />
-              <span className="text-[10px] font-bold text-slate-400 uppercase px-1">
-                to
-              </span>
-              <input
-                type="date"
-                value={createdAtEnd}
-                onChange={(e) => {
-                  setCreatedAtEnd(e.target.value);
-                  setPagination((p) => ({ ...p, current_page: 1 }));
-                }}
-                className="bg-transparent text-[11px] font-medium text-slate-600 outline-none cursor-pointer"
-              />
-            </div>
-
-            {/* CLEAR ACTION BUTTON */}
-            {(createdAtStart || createdAtEnd) && (
-              <button
-                onClick={() => {
-                  setCreatedAtStart("");
-                  setCreatedAtEnd("");
-                  setPagination((p) => ({ ...p, current_page: 1 }));
-                }}
-                className="h-9 px-3 rounded-lg bg-red-50 border border-red-200 text-red-600 font-bold text-[11px] hover:bg-red-100 transition-colors"
-              >
-                Clear Range
-              </button>
-            )}
-          </div>
         }
       />
     </div>

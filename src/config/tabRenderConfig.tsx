@@ -7,10 +7,10 @@ const UsersPage = lazy(() => import("@/pages/users/UsersPage"));
 const RolesPage = lazy(() => import("@/pages/roles/RolesPage"));
 const RoleFormPage = lazy(() => import("@/pages/roles/RoleFormPage"));
 const DataSourcesPage = lazy(
-  () => import("@/components/data_sources/DataSourcesPage"),
+  () => import("@/pages/data_sources/DataSourcesPage"),
 );
 const DataSourceFormPage = lazy(
-  () => import("@/components/data_sources/DataSourceFormPage"),
+  () => import("@/pages/data_sources/DataSourceFormPage"),
 );
 const ProviderInstancesPage = lazy(
   () => import("@/pages/provider_instances/ProviderInstancesPage"),

@@ -150,7 +150,7 @@ export default function DataSourcesPage() {
       ],
       onChange: (val: string) => {
         setTypeFilter(val);
-        setCurrentPage(1); // Reset to first page on filter change
+        setCurrentPage(1);
       },
     },
     {
@@ -163,7 +163,7 @@ export default function DataSourcesPage() {
       ],
       onChange: (val: string) => {
         setStatusFilter(val);
-        setCurrentPage(1); // Reset to first page on filter change
+        setCurrentPage(1);
       },
     },
   ];
@@ -194,6 +194,7 @@ export default function DataSourcesPage() {
         pagination={pagination}
         searchPlaceholder="Search data sources..."
         searchWidth="w-full md:w-64"
+        filters={filterConfigs}
         onPageChange={(page) => setCurrentPage(page)}
         onPageSizeChange={(newSize) => {
           setPageSize(newSize);
@@ -204,53 +205,6 @@ export default function DataSourcesPage() {
           setCurrentPage(1);
         }}
         onAddClick={() => navigate("/data-sources/create")}
-        filterContent={
-          <div className="flex flex-wrap items-center gap-2">
-            {/* TYPE FILTER */}
-            <select
-              value={typeFilter}
-              onChange={(e) => {
-                setTypeFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 h-9"
-            >
-              <option value="">All Types</option>
-              <option value="api">API</option>
-              <option value="database">Database</option>
-              <option value="sftp">SFTP</option>
-              <option value="upload">Upload</option>
-            </select>
-
-            {/* STATUS FILTER */}
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 h-9"
-            >
-              <option value="">All Status</option>
-              <option value="1">Active</option>
-              <option value="0">Inactive</option>
-            </select>
-
-            {/* CLEAR BUTTON */}
-            {(typeFilter || statusFilter) && (
-              <button
-                onClick={() => {
-                  setTypeFilter("");
-                  setStatusFilter("");
-                  setCurrentPage(1);
-                }}
-                className="h-9 px-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-[11px] font-bold hover:bg-red-100"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-        }
       />
 
       <DeleteConfirmationModal
