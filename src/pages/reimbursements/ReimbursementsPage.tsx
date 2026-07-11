@@ -24,6 +24,7 @@ import {
   reimbursementsService,
   type ReimbursementFilters,
 } from "@/services/reimbursementsService";
+import { BundleDisplay } from "@/components/reimbursements/BundleDisplay";
 
 export default function ReimbursementsPage() {
   const navigate = useNavigate();
@@ -95,6 +96,7 @@ export default function ReimbursementsPage() {
         reimbursement_type: (typeFilter as any) || undefined,
         required_tier: tierFilter ? Number(tierFilter) : undefined,
         reimbursement_mode: (modeFilter as any) || undefined,
+        //bundle: [],
         created_by: createdByFilter || undefined,
         reviewed_by: reviewedByFilter || undefined,
         created_at_start: createdAtStart || undefined,
@@ -365,7 +367,7 @@ export default function ReimbursementsPage() {
       accessor: (item: any) => (
         <div className="space-y-1.5">
           <span className="block text-xs font-medium text-slate-600">
-            {item.target_product_id || `${item.amount} Airtime`}
+            {item.bundle ? item.bundle.name : `${item.amount} Airtime`}
           </span>
           <span
             className={cn(

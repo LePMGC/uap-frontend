@@ -40,9 +40,9 @@ export const useAuthStore = create<AuthState>()(
             ...user,
             // Ensure key names match exactly what you saw in jwt.io
             username: decoded.username || user.username,
-            role: Array.isArray(decoded.roles)
-              ? decoded.roles[0]
-              : decoded.roles,
+            role:
+              decoded.role ||
+              (Array.isArray(decoded.roles) ? decoded.roles[0] : decoded.roles),
             permissions: decoded.permissions || [],
           };
 

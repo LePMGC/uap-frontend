@@ -25,6 +25,7 @@ import {
   reimbursementsService,
   type ReimbursementCreationPayload,
 } from "@/services/reimbursementsService";
+import { BundleDisplay } from "@/components/reimbursements/BundleDisplay";
 
 type DistributionMode = "SINGLE_SINGLE" | "MANY_SINGLE" | "MANY_MANY";
 type AssetType = "BUNDLE" | "AIRTIME";
@@ -42,45 +43,15 @@ interface IngestionMetrics {
   invalid: number;
 }
 
-const MOCK_BUNDLE_CATEGORIES = [
-  "Data",
-  "Voice",
-  "SMS",
-  "Combo",
-  "International",
-];
-const MOCK_BUNDLES_DB = [
-  {
-    id: "DATA_DAILY_1GB",
-    name: "Daily Heavy Data 1GB",
-    category: "Data",
-    price: "CFA 10.00",
-  },
-  {
-    id: "DATA_WEEKLY_5GB",
-    name: "Weekly Super Surf 5GB",
-    category: "Data",
-    price: "CFA 50.00",
-  },
-  {
-    id: "VOICE_MONTHLY_600M",
-    name: "TalkMore Monthly 600 Mins",
-    category: "Voice",
-    price: "CFA 30.00",
-  },
-  {
-    id: "SMS_BATCH_500",
-    name: "Enterprise Bulk 500 SMS Pack",
-    category: "SMS",
-    price: "CFA 5.00",
-  },
-  {
-    id: "COMBO_BIZ_PREMIUM",
-    name: "Executive Uncapped Combo Bundle",
-    category: "Combo",
-    price: "CFA 250.00",
-  },
-];
+interface BackendBundleItem {
+  id: number;
+  offer_id: number;
+  name: string;
+  category: string;
+  price: string;
+  validity: number | null;
+  validity_units: string;
+}
 
 export default function CreateReimbursementPage() {
   const navigate = useNavigate();
@@ -98,7 +69,11 @@ export default function CreateReimbursementPage() {
   // --- ASSET CONFIGURATION & CASCADE SEARCH SELECTORS ---
   const [reimbursementType, setReimbursementType] =
     useState<AssetType>("BUNDLE");
-  const [selectedCategory, setSelectedCategory] = useState("Data");
+  const [categories, setCategories] = useState<string[]>([]);
+  const [bundles, setBundles] = useState<BackendBundleItem[]>([]);
+  const [isLoadingCatalog, setIsLoadingCatalog] = useState(false);
+
+  const [selectedCategory, setSelectedCategory] = useState("");
   const [targetProductId, setTargetProductId] = useState("");
   const [amount, setAmount] = useState("");
 
@@ -163,28 +138,70 @@ export default function CreateReimbursementPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    async function loadCatalog() {
+      try {
+        setIsLoadingCatalog(true);
+        const response = await reimbursementsService.getBundles();
+
+        if (!response.success) {
+          throw new Error("Unable to load catalog");
+        }
+
+        const backendBundles: BackendBundleItem[] = response.data.bundles ?? [];
+        setBundles(backendBundles);
+
+        const officialCategories = response.data.categories ?? [];
+        setCategories(officialCategories);
+
+        if (officialCategories.length > 0) {
+          setSelectedCategory(officialCategories[0]);
+        }
+      } catch (err) {
+        console.error(err);
+        showToast("Unable to load reimbursement catalog.", "error");
+      } finally {
+        setIsLoadingCatalog(false);
+      }
+    }
+
+    loadCatalog();
+  }, [showToast]);
+
   // Filter products by category and input text
   const filteredBundles = useMemo(() => {
-    return MOCK_BUNDLES_DB.filter(
-      (b) =>
+    return bundles.filter((b) => {
+      return (
         b.category === selectedCategory &&
-        b.name.toLowerCase().includes(searchQuery.toLowerCase()),
-    );
-  }, [selectedCategory, searchQuery]);
+        (b.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          String(b.id).includes(searchQuery) ||
+          String(b.offer_id).includes(searchQuery))
+      );
+    });
+  }, [bundles, selectedCategory, searchQuery]);
 
+  // Safe representation string capturing string vs number differences cleanly
   const currentSelectedBundleName = useMemo(() => {
-    const found = MOCK_BUNDLES_DB.find((b) => b.id === targetProductId);
-    return found
-      ? `${found.name} (${found.price})`
-      : "Select a bundle catalog item...";
-  }, [targetProductId]);
+    const found = bundles.find((b) => String(b.id) === String(targetProductId));
+
+    if (!found) {
+      return "Select a bundle catalog item...";
+    }
+
+    return (
+      <BundleDisplay
+        name={found.name}
+        offerId={found.offer_id}
+        price={found.price}
+      />
+    );
+  }, [bundles, targetProductId]);
 
   // --- DYNAMIC LIVE FILE TEMPLATE DOWNLOAD HANDLER ---
   const handleTemplateDownload = async () => {
     try {
       setIsDownloading(true);
 
-      // Consume the service layer function by passing the component's state values
       await reimbursementsService.downloadTemplate(
         distributionMode,
         templateFormat,
@@ -211,7 +228,6 @@ export default function CreateReimbursementPage() {
     setBulkErrors([]);
 
     try {
-      // Execute the live validation API call via the service layer
       const response = await reimbursementsService.validateInboundSheet(
         file,
         distributionMode,
@@ -265,17 +281,15 @@ export default function CreateReimbursementPage() {
       const uploadedItems: { id: string; name: string; size: string }[] = [];
 
       for (const file of Array.from(files)) {
-        // 1. Post file stream to server
         const response =
           await reimbursementsService.uploadEvidenceAttachment(file);
 
-        // 2. Safely capture the nested payload data block returned by your controller
         const serverPayload = (response as any).data;
 
         if (serverPayload && serverPayload.id) {
           uploadedItems.push({
-            id: serverPayload.id, // Extracts the string UUID safely
-            name: serverPayload.file_name, // Extracts "Fiche hebdomadaire de Suivi 05 juin 2026.pdf"
+            id: serverPayload.id,
+            name: serverPayload.file_name,
             size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
           });
         }
@@ -307,12 +321,11 @@ export default function CreateReimbursementPage() {
     if (!ticketId.trim())
       return showToast("Trouble Ticket identifier number is required", "error");
 
-    // CORRECT CODE TO PATCH IN THE FORM SUBMISSION BLOCK ✅
     const payload: ReimbursementCreationPayload = {
       ticket_id: ticketId,
       reimbursement_type: reimbursementType,
       reimbursement_mode: reimbursementMode,
-      is_bulk: distributionMode !== "SINGLE_SINGLE", // or true if using file ingestions
+      is_bulk: distributionMode !== "SINGLE_SINGLE",
       description: description,
       target_product_id:
         reimbursementType === "BUNDLE" ? targetProductId : undefined,
@@ -320,8 +333,6 @@ export default function CreateReimbursementPage() {
       msisdn: distributionMode === "SINGLE_SINGLE" ? singleMsisdn : undefined,
       file_reference_id: fileReferenceId || undefined,
 
-      // Strict reference array generation: Extract the 'id' parameter
-      // and guarantee that no empty/null elements bypass into the payload
       attachment_ids: attachments
         .map((att) => att.id)
         .filter((id) => id !== null && id !== undefined && id !== ""),
@@ -681,8 +692,8 @@ export default function CreateReimbursementPage() {
                       <label className="text-xs font-bold text-slate-600">
                         Bundle Category
                       </label>
-                      <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
-                        {MOCK_BUNDLE_CATEGORIES.map((cat) => (
+                      <div className="flex overflow-x-auto flex-nowrap gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 scrollbar-thin scrollbar-thumb-slate-300">
+                        {categories.map((cat) => (
                           <button
                             key={cat}
                             type="button"
@@ -691,13 +702,13 @@ export default function CreateReimbursementPage() {
                               setTargetProductId("");
                             }}
                             className={cn(
-                              "flex-1 py-1 px-2 text-[10px] font-bold rounded-lg transition-all text-center",
+                              "shrink-0 whitespace-nowrap py-1.5 px-3 text-[10px] font-bold rounded-lg transition-all text-center",
                               selectedCategory === cat
                                 ? "bg-white text-indigo-600 shadow-sm"
                                 : "text-slate-500 hover:text-slate-800",
                             )}
                           >
-                            {cat}
+                            {cat.replace("_", " ")}
                           </button>
                         ))}
                       </div>
@@ -747,21 +758,30 @@ export default function CreateReimbursementPage() {
                                 <div
                                   key={pkg.id}
                                   onClick={() => {
-                                    setTargetProductId(pkg.id);
+                                    setTargetProductId(String(pkg.id));
                                     setIsSearchOpen(false);
                                     setSearchQuery("");
                                   }}
                                   className={cn(
-                                    "w-full px-3 py-2 text-[11px] rounded-lg font-bold flex items-center justify-between cursor-pointer transition-colors",
-                                    targetProductId === pkg.id
-                                      ? "bg-indigo-50 text-indigo-700"
-                                      : "hover:bg-slate-50 text-slate-700",
+                                    "w-full px-3 py-2 rounded-lg cursor-pointer transition-colors",
+                                    String(targetProductId) === String(pkg.id)
+                                      ? "bg-indigo-50"
+                                      : "hover:bg-slate-50",
                                   )}
                                 >
-                                  <span>{pkg.name}</span>
-                                  <span className="font-mono text-[10px] bg-slate-200/60 px-1.5 py-0.5 rounded text-slate-600">
-                                    {pkg.price}
-                                  </span>
+                                  <div className="font-bold text-[11px] text-slate-800">
+                                    {pkg.name}
+                                  </div>
+
+                                  <div className="flex items-center justify-between mt-1">
+                                    <span className="font-mono text-[10px] text-slate-500">
+                                      Offer ID: {pkg.offer_id}
+                                    </span>
+
+                                    <span className="font-mono text-[10px] bg-slate-200/60 px-1.5 py-0.5 rounded text-slate-600">
+                                      {pkg.price}
+                                    </span>
+                                  </div>
                                 </div>
                               ))
                             )}
@@ -823,24 +843,18 @@ export default function CreateReimbursementPage() {
                     key={att.id}
                     className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs animate-in slide-in-from-top-1 duration-150"
                   >
-                    {/* flex-1 and min-w-0 forces the flex container to respect text boundaries */}
                     <div className="flex items-center gap-2 font-semibold text-slate-700 min-w-0 flex-1 pr-4">
                       <Paperclip className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
-
-                      {/* Name section with responsive truncation layout */}
                       <span
                         className="truncate text-slate-800 font-bold max-w-[240px] block"
                         title={att.name}
                       >
                         {att.name}
                       </span>
-
-                      {/* Size Badge */}
                       <span className="text-[10px] font-mono font-normal text-slate-400 shrink-0">
                         ({att.size})
                       </span>
                     </div>
-
                     <button
                       type="button"
                       onClick={() => removeAttachment(att.id)}
@@ -878,7 +892,6 @@ export default function CreateReimbursementPage() {
     </div>
   );
 
-  // --- COMPACT LIVE BACK-END REGISTRY SUMMARY RENDERER ---
   function renderFileZone() {
     if (isProcessingFile) {
       return (
@@ -977,7 +990,6 @@ export default function CreateReimbursementPage() {
           </div>
         </div>
 
-        {/* RENDERS LIVE ERROR LOG RECORDS ONLY IF AN UNMAPPED PARSING FAILURE OCCURS */}
         {bulkErrors.length > 0 && (
           <div className="flex flex-col gap-1 animate-in slide-in-from-top-2 duration-200">
             <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider block">

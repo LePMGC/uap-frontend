@@ -9,6 +9,7 @@ export interface ReimbursementFilters {
   msisdn?: string;
   reimbursement_type?: "BUNDLE" | "AIRTIME";
   target_product_id?: string;
+
   required_tier?: number;
   requested_by_user_id?: string | number;
   approved_by_user_id?: string | number;
@@ -446,6 +447,12 @@ export const reimbursementsService = {
 
   getReviewers: async () => {
     const response = await api.get("/operations/reimbursements/reviewers");
+
+    return response.data;
+  },
+
+  getBundles: async () => {
+    const response = await api.get("/operations/catalog/bundles");
 
     return response.data;
   },

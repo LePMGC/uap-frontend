@@ -115,7 +115,9 @@ export function GenericDataTable<T>({
   const filterKeys = filters.map(
     (filter, index) => filter.id || filter.label || `filter-${index}`,
   );
-  const [visibleFilters, setVisibleFilters] = useState<string[]>([]);
+  const [visibleFilters, setVisibleFilters] = useState<string[]>(
+    filterContent?.map((f) => f.id) ?? [],
+  );
   const filterContentKeys = (filterContent ?? []).map((f) => f.id);
   const allFilterKeys = [...filterKeys, ...filterContentKeys];
 
@@ -125,16 +127,10 @@ export function GenericDataTable<T>({
   );
 
   useEffect(() => {
-    setVisibleFilters((current) => {
-      // First load: hide everything
-      if (current.length === 0) {
-        return [];
-      }
-
-      // Keep only filters that still exist
-      return current.filter((k) => allFilterKeys.includes(k));
-    });
-  }, [filters, filterContent]);
+    setVisibleFilters((current) =>
+      current.filter((k) => filterContentKeys.includes(k)),
+    );
+  }, [filterContentKeys.join(",")]);
 
   // Sync menu state out when interacting with background layers
   useEffect(() => {

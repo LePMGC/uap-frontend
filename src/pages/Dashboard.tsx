@@ -3,6 +3,8 @@ import { ProviderHealthList } from "@/components/dashboard/ProviderHealthList";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { PlatformHealth } from "@/components/dashboard/PlatformHealth";
 import { useState, useEffect } from "react";
+import { HasPermission } from "@/components/auth/HasPermission";
+import { PERM } from "@/types/auth";
 
 export default function Dashboard() {
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -15,7 +17,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 max-w-[1600px] mx-auto">
-      <StatsCards isLoading={isInitialLoading} />
+      <HasPermission permission={PERM.VIEW_CONNECTIVITY_STATS}>
+        <StatsCards isLoading={isInitialLoading} />
+      </HasPermission>
 
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
         <div className="xl:col-span-3 space-y-8">
@@ -23,9 +27,11 @@ export default function Dashboard() {
         </div>
 
         <div className="xl:col-span-1 flex flex-col gap-6">
-          <PlatformHealth isLoading={isInitialLoading} />
-          <ProviderHealthList />{" "}
-          {/* This one manages its own polling/loading */}
+          <HasPermission permission={PERM.VIEW_CONNECTIVITY_STATS}>
+            <PlatformHealth isLoading={isInitialLoading} />
+            <ProviderHealthList />{" "}
+            {/* This one manages its own polling/loading */}
+          </HasPermission>
         </div>
       </div>
     </div>

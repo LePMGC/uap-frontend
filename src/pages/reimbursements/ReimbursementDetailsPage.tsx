@@ -36,6 +36,7 @@ import { useToastStore } from "@/hooks/useToastStore";
 import { useAuthStore } from "@/store/authStore";
 import { PERM } from "@/types/auth";
 import { cn } from "@/lib/utils";
+import { BundleDisplay } from "@/components/reimbursements/BundleDisplay";
 
 type TemplateFormat = "xlsx" | "csv" | "txt";
 
@@ -51,63 +52,15 @@ interface IngestionMetrics {
   invalid: number;
 }
 
-const MOCK_BUNDLE_CATEGORIES = [
-  "Data",
-  "Voice",
-  "SMS",
-  "Combo",
-  "International",
-];
-const MOCK_BUNDLES_DB = [
-  {
-    id: "DATA_DAILY_1GB",
-    name: "Daily Heavy Data 1GB",
-    category: "Data",
-    price: "CFA 10.00",
-  },
-  {
-    id: "DATA_WEEKLY_5GB",
-    name: "Weekly Super Data 5GB",
-    category: "Data",
-    price: "CFA 50.00",
-  },
-  {
-    id: "DATA_MONTHLY_20GB",
-    name: "Monthly Elite Data 20GB",
-    category: "Data",
-    price: "CFA 150.00",
-  },
-  {
-    id: "VOICE_DAILY_MINS",
-    name: "Daily Talk 50 Mins",
-    category: "Voice",
-    price: "CFA 5.00",
-  },
-  {
-    id: "VOICE_MONTHLY_600M",
-    name: "Monthly Corporate 600 Mins",
-    category: "Voice",
-    price: "CFA 80.00",
-  },
-  {
-    id: "SMS_WEEKLY_MAX",
-    name: "Weekly SMS Blast 500 SMS",
-    category: "SMS",
-    price: "CFA 12.00",
-  },
-  {
-    id: "COMBO_WEEKLY_MED",
-    name: "Weekly Hybrid Med Bundle",
-    category: "Combo",
-    price: "CFA 25.00",
-  },
-  {
-    id: "INT_ZONE_A_ROAM",
-    name: "International Roaming Zone A",
-    category: "International",
-    price: "CFA 200.00",
-  },
-];
+interface BackendBundleItem {
+  id: number;
+  offer_id: number;
+  name: string;
+  category: string;
+  price: string;
+  validity: number | null;
+  validity_units: string;
+}
 
 export default function ReimbursementDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -159,10 +112,16 @@ export default function ReimbursementDetailsPage() {
   const [isBulk, setIsBulk] = useState<boolean>(false);
   const [msisdn, setMsisdn] = useState<string>("");
   const [targetProductId, setTargetProductId] = useState<string>("");
+  const [bundle, setBundle] = useState<BackendBundleItem | null>(null);
   const [amount, setAmount] = useState<string>("");
   const [attachments, setAttachments] = useState<
     { id: string; name: string }[]
   >([]);
+
+  // Live Catalog Back-End Sync Layers
+  const [categories, setCategories] = useState<string[]>([]);
+  const [bundles, setBundles] = useState<BackendBundleItem[]>([]);
+  const [isLoadingCatalog, setIsLoadingCatalog] = useState(false);
 
   // Bulk Staging Overwrites
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -187,7 +146,7 @@ export default function ReimbursementDetailsPage() {
   const [isDownloadingInput, setIsDownloadingInput] = useState<boolean>(false);
 
   // Dropdown Category Selectors
-  const [selectedCategory, setSelectedCategory] = useState<string>("Data");
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isOpenDropdown, setIsOpenDropdown] = useState<boolean>(false);
 
@@ -213,21 +172,75 @@ export default function ReimbursementDetailsPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Fetch Live Bundle Catalog Data from the Back-End
+  useEffect(() => {
+    async function loadCatalog() {
+      try {
+        setIsLoadingCatalog(true);
+        const response = await reimbursementsService.getBundles();
+
+        if (!response.success) {
+          throw new Error("Unable to load catalog");
+        }
+
+        const backendBundles: BackendBundleItem[] = response.data.bundles ?? [];
+        setBundles(backendBundles);
+
+        const officialCategories = response.data.categories ?? [];
+        setCategories(officialCategories);
+
+        if (officialCategories.length > 0 && !selectedCategory) {
+          setSelectedCategory(officialCategories[0]);
+        }
+      } catch (err) {
+        console.error(err);
+        showToast("Unable to load reimbursement catalog.", "error");
+      } finally {
+        setIsLoadingCatalog(false);
+      }
+    }
+
+    loadCatalog();
+  }, [showToast]);
+
   const filteredBundles = useMemo(() => {
-    return MOCK_BUNDLES_DB.filter(
+    return bundles.filter(
       (b) =>
         b.category === selectedCategory &&
         (b.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          b.id.toLowerCase().includes(searchQuery.toLowerCase())),
+          String(b.id).includes(searchQuery) ||
+          String(b.offer_id).includes(searchQuery)),
     );
-  }, [selectedCategory, searchQuery]);
+  }, [bundles, selectedCategory, searchQuery]);
 
   const selectedBundleName = useMemo(() => {
-    const bundle = MOCK_BUNDLES_DB.find((b) => b.id === targetProductId);
-    return bundle
-      ? `${bundle.name} (${bundle.price})`
-      : "Choose explicit product schema...";
-  }, [targetProductId]);
+    const found = bundles.find((b) => String(b.id) === String(targetProductId));
+    if (!found) {
+      return "Choose explicit product schema...";
+    }
+
+    return (
+      <span className="flex items-center gap-3 text-xs">
+        <span className="font-bold text-slate-800">{found.name}</span>
+        <span className="text-slate-400">|</span>
+        <span className="font-mono text-slate-600">#{found.offer_id}</span>
+        <span className="text-slate-400">|</span>
+        <span className="font-semibold text-indigo-600">{found.price}</span>
+      </span>
+    );
+  }, [bundles, targetProductId]);
+
+  // Handle setting category once details match live catalog definitions
+  useEffect(() => {
+    if (record?.target_product_id && bundles.length > 0) {
+      const matchingBundle = bundles.find(
+        (b) => String(b.id) === String(record.target_product_id),
+      );
+      if (matchingBundle) {
+        setSelectedCategory(matchingBundle.category);
+      }
+    }
+  }, [record?.target_product_id, bundles]);
 
   const fetchDetails = async () => {
     if (!id) return;
@@ -248,7 +261,10 @@ export default function ReimbursementDetailsPage() {
       setReimbursementMode(data.reimbursement_mode);
       setIsBulk(!!data.is_bulk);
       setMsisdn((data as any).msisdn || "");
-      setTargetProductId(data.target_product_id || "");
+      setTargetProductId(
+        data.target_product_id ? String(data.target_product_id) : "",
+      );
+      setBundle(data.bundle || null);
       setAmount(
         data.amount !== null && data.amount !== undefined
           ? String(data.amount)
@@ -259,13 +275,6 @@ export default function ReimbursementDetailsPage() {
       setUploadedFile(null);
       setNewFileReferenceId(null);
       setBulkErrors([]);
-
-      if (data.target_product_id) {
-        const matchingBundle = MOCK_BUNDLES_DB.find(
-          (b) => b.id === data.target_product_id,
-        );
-        if (matchingBundle) setSelectedCategory(matchingBundle.category);
-      }
 
       if (data.attachments) {
         setAttachments(
@@ -590,14 +599,8 @@ export default function ReimbursementDetailsPage() {
           </button>
           <div>
             <div className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">
-              Reimbursement Request Sequence Workspace
+              Reimbursement Details
             </div>
-            <h1 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-              ID:{" "}
-              <span className="font-mono text-indigo-600 text-base font-semibold bg-indigo-50/50 px-2 py-0.5 rounded border border-indigo-100">
-                {record.id}
-              </span>
-            </h1>
           </div>
         </div>
 
@@ -881,8 +884,8 @@ export default function ReimbursementDetailsPage() {
               {isEditing ? (
                 reimbursementType === "BUNDLE" ? (
                   <div className="flex flex-col gap-3 mt-1.5">
-                    <div className="flex flex-wrap gap-1 border-b border-slate-200 pb-2">
-                      {MOCK_BUNDLE_CATEGORIES.map((cat) => (
+                    <div className="flex overflow-x-auto flex-nowrap gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 scrollbar-thin scrollbar-thumb-slate-300">
+                      {categories.map((cat) => (
                         <button
                           key={cat}
                           type="button"
@@ -891,13 +894,13 @@ export default function ReimbursementDetailsPage() {
                             setTargetProductId("");
                           }}
                           className={cn(
-                            "px-2.5 py-1 text-[10px] font-bold rounded-md transition-all border",
+                            "shrink-0 whitespace-nowrap py-1.5 px-3 text-[10px] font-bold rounded-lg transition-all text-center border-0",
                             selectedCategory === cat
-                              ? "bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm"
-                              : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50",
+                              ? "bg-white text-indigo-600 shadow-sm"
+                              : "text-slate-500 hover:text-slate-800",
                           )}
                         >
-                          {cat}
+                          {cat.replace("_", " ")}
                         </button>
                       ))}
                     </div>
@@ -918,7 +921,7 @@ export default function ReimbursementDetailsPage() {
                       </button>
 
                       {isOpenDropdown && (
-                        <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-2 flex flex-col gap-1.5 max-h-56">
+                        <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-2 flex flex-col gap-2 max-h-60 overflow-y-auto">
                           <div className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
                             <Search className="h-3.5 w-3.5 text-slate-400" />
                             <input
@@ -929,39 +932,39 @@ export default function ReimbursementDetailsPage() {
                               className="w-full bg-transparent text-[11px] font-medium outline-none text-slate-700"
                             />
                           </div>
-                          <div className="flex flex-col gap-0.5 overflow-y-auto">
+                          <div className="flex flex-col gap-0.5">
                             {filteredBundles.length === 0 ? (
                               <div className="text-center p-3 text-slate-400 text-[10px] font-mono">
                                 No matching bundles found...
                               </div>
                             ) : (
-                              filteredBundles.map((bundle) => (
+                              filteredBundles.map((pkg) => (
                                 <button
-                                  key={bundle.id}
+                                  key={pkg.id}
                                   type="button"
                                   onClick={() => {
-                                    setTargetProductId(bundle.id);
+                                    setTargetProductId(String(pkg.id));
                                     setIsOpenDropdown(false);
                                     setSearchQuery("");
                                   }}
                                   className={cn(
-                                    "w-full text-left p-2 rounded-lg text-[11px] font-medium flex items-center justify-between transition-colors",
-                                    targetProductId === bundle.id
-                                      ? "bg-indigo-600 text-white font-bold"
-                                      : "text-slate-700 hover:bg-slate-50",
+                                    "w-full text-left px-3 py-2 rounded-lg cursor-pointer transition-colors flex flex-col gap-0.5 border-0",
+                                    String(targetProductId) === String(pkg.id)
+                                      ? "bg-indigo-50"
+                                      : "hover:bg-slate-50 bg-transparent",
                                   )}
                                 >
-                                  <span>{bundle.name}</span>
-                                  <span
-                                    className={cn(
-                                      "font-mono text-[10px]",
-                                      targetProductId === bundle.id
-                                        ? "text-indigo-100"
-                                        : "text-slate-400",
-                                    )}
-                                  >
-                                    {bundle.price}
-                                  </span>
+                                  <div className="font-bold text-[11px] text-slate-800">
+                                    {pkg.name}
+                                  </div>
+                                  <div className="flex items-center justify-between w-full mt-1">
+                                    <span className="font-mono text-[10px] text-slate-500">
+                                      Offer ID: {pkg.offer_id}
+                                    </span>
+                                    <span className="font-mono text-[10px] bg-slate-200/60 px-1.5 py-0.5 rounded text-slate-600">
+                                      {pkg.price}
+                                    </span>
+                                  </div>
                                 </button>
                               ))
                             )}
@@ -987,9 +990,19 @@ export default function ReimbursementDetailsPage() {
                 )
               ) : (
                 <span className="font-bold text-slate-900 mt-0.5 font-mono text-xs">
-                  {reimbursementType === "BUNDLE"
-                    ? targetProductId || "None chosen"
-                    : `AIRTIME AMOUNT: CFA ${Number(amount || 0).toFixed(2)}`}
+                  {reimbursementType === "BUNDLE" ? (
+                    bundle ? (
+                      <BundleDisplay
+                        name={bundle?.name}
+                        offerId={bundle?.offer_id}
+                        price={bundle?.price}
+                      />
+                    ) : (
+                      "None chosen"
+                    )
+                  ) : (
+                    `AIRTIME AMOUNT: ${amount} `
+                  )}
                 </span>
               )}
             </div>

@@ -2,8 +2,10 @@ export type UserRole = string;
 
 export interface User {
   id?: string | number;
-  name: string;
+  name?: string;
+  username?: string;
   email?: string;
+  phone_number?: string;
   role?: string;
   permissions?: string[];
 }
