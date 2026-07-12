@@ -46,6 +46,12 @@ const CreateReimbursementPage = lazy(
 const ReimbursementDetailsPage = lazy(
   () => import("@/pages/reimbursements/ReimbursementDetailsPage"),
 );
+const FundingAccountsPage = lazy(
+  () => import("@/pages/funding-accounts/FundingAccountsPage"),
+);
+const ProvisioningProfilesPage = lazy(
+  () => import("@/pages/provisioning-profiles/ProvisioningProfilesPage"),
+);
 
 export function renderTabContent(
   tabId: string,
@@ -127,6 +133,22 @@ export function renderTabContent(
         Component = ReimbursementDetailsPage;
         componentProps = { id: parts[1] };
       } else Component = ReimbursementsPage;
+      break;
+
+    case "funding-accounts":
+      if (parts[1] === "create") Component = FundingAccountsPage;
+      else if (parts[1]) {
+        Component = FundingAccountsPage;
+        componentProps = { id: parts[1] };
+      } else Component = FundingAccountsPage;
+      break;
+
+    case "provisioning-profiles":
+      if (parts[1] === "create") Component = ProvisioningProfilesPage;
+      else if (parts[1]) {
+        Component = ProvisioningProfilesPage;
+        componentProps = { id: parts[1] };
+      } else Component = ProvisioningProfilesPage;
       break;
 
     default:

@@ -87,6 +87,8 @@ const menuGroups = [
       PERM.VIEW_ALL_COMMANDS,
       PERM.VIEW_OWN_COMMANDS,
       PERM.VIEW_COMMAND_BLUEPRINTS,
+      PERM.VIEW_PROVISIONING_PROFILES,
+      PERM.VIEW_FUNDING_ACCOUNTS,
     ],
     items: [
       {
@@ -106,6 +108,18 @@ const menuGroups = [
         icon: Code2,
         url: "/commands-definitions",
         requiredPermission: PERM.VIEW_OWN_COMMANDS,
+      },
+      {
+        name: "Provisioning Profiles",
+        icon: Layers,
+        url: "/provisioning-profiles",
+        requiredPermission: PERM.VIEW_PROVISIONING_PROFILES,
+      },
+      {
+        name: "Funding Accounts",
+        icon: Server,
+        url: "/funding-accounts",
+        requiredPermission: PERM.VIEW_FUNDING_ACCOUNTS,
       },
     ],
   },

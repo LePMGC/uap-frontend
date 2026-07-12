@@ -66,6 +66,19 @@ export const PERM = {
   MANAGE_REIMBURSEMENT_SETTINGS: "manage_reimbursement_settings",
   CANCEL_REIMBURSEMENTS: "cancel_reimbursements",
 
+  // PROVISIONING PROFILES
+  VIEW_PROVISIONING_PROFILES: "view_provisioning_profiles",
+  CREATE_PROVISIONING_PROFILES: "create_provisioning_profiles",
+  EDIT_PROVISIONING_PROFILES: "edit_provisioning_profiles",
+  DELETE_PROVISIONING_PROFILES: "delete_provisioning_profiles",
+  RETRY_FAILED_PROVISIONING: "retry_failed_provisioning",
+
+  //FUNDING ACCOUNTS
+  VIEW_FUNDING_ACCOUNTS: "view_funding_accounts",
+  CREATE_FUNDING_ACCOUNTS: "create_funding_accounts",
+  EDIT_FUNDING_ACCOUNTS: "edit_funding_accounts",
+  DELETE_FUNDING_ACCOUNTS: "delete_funding_accounts",
+
   // Commands
   EXECUTE_COMMANDS: "execute_commands",
   EXECUTE_ALL_COMMANDS: "execute_all_commands",
