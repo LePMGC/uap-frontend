@@ -28,6 +28,8 @@ import FundingAccountsPage from "./pages/funding-accounts/FundingAccountsPage";
 import ProvisioningProfilesPage from "./pages/provisioning-profiles/ProvisioningProfilesPage";
 import CreateFundingAccountPage from "./pages/funding-accounts/CreateFundingAccountPage";
 import FundingAccountDetailsPage from "./pages/funding-accounts/FundingAccountDetailsPage";
+import ProvisioningProfileDetailsPage from "./pages/provisioning-profiles/ProvisioningProfileDetailsPage";
+import CreateProvisioningProfilePage from "./pages/provisioning-profiles/CreateProvisioningProfilePage";
 
 export default function App() {
   const { isAuthenticated, needsPasswordChange } = useAuthStore();
@@ -129,6 +131,16 @@ export default function App() {
           <Route
             path="/provisioning-profiles"
             element={<ProvisioningProfilesPage />}
+          />
+
+          <Route
+            path="/provisioning-profiles/create"
+            element={<CreateProvisioningProfilePage />}
+          />
+
+          <Route
+            path="/provisioning-profiles/:id"
+            element={<ProvisioningProfileDetailsPage />}
           />
 
           <Route

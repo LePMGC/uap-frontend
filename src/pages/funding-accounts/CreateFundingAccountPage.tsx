@@ -51,7 +51,7 @@ export default function CreateFundingAccountPage() {
   };
 
   return (
-    <div className="p-8 max-w-[600px] mx-auto space-y-6 animate-in fade-in duration-300">
+    <div className="p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
       <div className="flex items-center gap-4">
         <button
           onClick={() => navigate("/funding-accounts")}

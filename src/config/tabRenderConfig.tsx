@@ -49,8 +49,20 @@ const ReimbursementDetailsPage = lazy(
 const FundingAccountsPage = lazy(
   () => import("@/pages/funding-accounts/FundingAccountsPage"),
 );
+const CreateFundingAccountPage = lazy(
+  () => import("@/pages/funding-accounts/CreateFundingAccountPage"),
+);
+const FundingAccountDetailsPage = lazy(
+  () => import("@/pages/funding-accounts/FundingAccountDetailsPage"),
+);
 const ProvisioningProfilesPage = lazy(
   () => import("@/pages/provisioning-profiles/ProvisioningProfilesPage"),
+);
+const CreateProvisioningProfilePage = lazy(
+  () => import("@/pages/provisioning-profiles/CreateProvisioningProfilePage"),
+);
+const ProvisioningProfileDetailsPage = lazy(
+  () => import("@/pages/provisioning-profiles/ProvisioningProfileDetailsPage"),
 );
 
 export function renderTabContent(
@@ -136,17 +148,17 @@ export function renderTabContent(
       break;
 
     case "funding-accounts":
-      if (parts[1] === "create") Component = FundingAccountsPage;
+      if (parts[1] === "create") Component = CreateFundingAccountPage;
       else if (parts[1]) {
-        Component = FundingAccountsPage;
+        Component = FundingAccountDetailsPage;
         componentProps = { id: parts[1] };
       } else Component = FundingAccountsPage;
       break;
 
     case "provisioning-profiles":
-      if (parts[1] === "create") Component = ProvisioningProfilesPage;
+      if (parts[1] === "create") Component = CreateProvisioningProfilePage;
       else if (parts[1]) {
-        Component = ProvisioningProfilesPage;
+        Component = ProvisioningProfileDetailsPage;
         componentProps = { id: parts[1] };
       } else Component = ProvisioningProfilesPage;
       break;

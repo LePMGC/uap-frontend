@@ -125,7 +125,7 @@ export default function FundingAccountDetailsPage() {
   if (!record) return null;
 
   return (
-    <div className="p-8 max-w-[700px] mx-auto space-y-6 animate-in fade-in duration-300">
+    <div className="p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
       <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-4">
         <div className="flex items-center gap-3">
           <button
