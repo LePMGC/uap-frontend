@@ -101,4 +101,8 @@ export const fundingAccountsService = {
 
     return response.data;
   },
+
+  async updateStatus(id: string, payload: { is_active: boolean }) {
+    return api.patch(`/operations/funding-accounts/${id}/status`, payload);
+  },
 };

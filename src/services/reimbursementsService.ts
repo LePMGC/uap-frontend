@@ -456,4 +456,10 @@ export const reimbursementsService = {
 
     return response.data;
   },
+
+  getBundleCategories: async () => {
+    const response = await api.get("/operations/catalog/bundle-categories");
+
+    return response.data;
+  },
 };

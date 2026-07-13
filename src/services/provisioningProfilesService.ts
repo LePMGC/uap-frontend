@@ -88,4 +88,16 @@ export const provisioningProfilesService = {
 
     return response.data;
   },
+
+  /**
+   *
+   * @param id
+   * @param is_active
+   * @returns
+   */
+  updateProfileStatus(id: string, is_active: boolean) {
+    return api.patch(`/operations/provisioning-profiles/${id}/status`, {
+      is_active,
+    });
+  },
 };

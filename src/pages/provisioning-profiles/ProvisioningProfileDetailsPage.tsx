@@ -19,11 +19,13 @@ import { useToastStore } from "@/hooks/useToastStore";
 import { cn } from "@/lib/utils";
 import { commandService } from "@/services/commandService";
 import { providerInstanceService } from "@/services/providerInstanceService";
+import { reimbursementsService } from "@/services/reimbursementsService";
 
 interface ProvisioningProfile {
   id: number;
   name: string;
   reimbursement_type: string;
+  catalog_product_types?: string[] | null;
   execution_mode: string;
   funding_account_id: number;
   is_active: boolean;
@@ -83,18 +85,28 @@ export default function ProvisioningProfileDetailsPage() {
   const [providerInstanceId, setProviderInstanceId] = useState("");
   const [commandId, setCommandId] = useState("");
   const [debitCommandId, setDebitCommandId] = useState("");
+  const [selectedBundleCategories, setSelectedBundleCategories] = useState<
+    string[]
+  >([]);
+  const [bundleCategories, setBundleCategories] = useState<string[]>([]);
 
   const loadProfileDetails = async () => {
     if (!id) return;
     try {
       setLoading(true);
-      const [profileRes, accountsRes, providersRes, commandsRes] =
-        await Promise.all([
-          provisioningProfilesService.getProfileById(id),
-          fundingAccountsService.getAccounts(1, 1000),
-          providerInstanceService.getAll(1, 1000),
-          commandService.getCommands(1, 1000),
-        ]);
+      const [
+        profileRes,
+        accountsRes,
+        providersRes,
+        commandsRes,
+        categoriesRes,
+      ] = await Promise.all([
+        provisioningProfilesService.getProfileById(id),
+        fundingAccountsService.getAccounts(1, 1000),
+        providerInstanceService.getAll(1, 1000),
+        commandService.getCommands(1, 1000),
+        reimbursementsService.getBundleCategories(),
+      ]);
 
       const data: ProvisioningProfile = profileRes.data || profileRes;
 
@@ -112,9 +124,12 @@ export default function ProvisioningProfileDetailsPage() {
       );
       setCommands(commandsRes?.data?.data ?? commandsRes?.data ?? []);
 
+      setBundleCategories(categoriesRes?.data ?? []);
+
       setProfile(data);
       setName(data.name);
       setReimbursementType(data.reimbursement_type);
+      setSelectedBundleCategories(data.catalog_product_types ?? []);
       setExecutionMode(data.execution_mode);
       setFundingAccountId(String(data.funding_account_id));
       setProviderInstanceId(String(data.provider_instance_id));
@@ -144,10 +159,7 @@ export default function ProvisioningProfileDetailsPage() {
 
     try {
       setIsActioning(true);
-
-      await provisioningProfilesService.updateProfile(id, {
-        is_active: nextState,
-      });
+      await provisioningProfilesService.updateProfileStatus(id, nextState);
 
       showToast(
         `Profile execution state set to ${nextState ? "Active" : "Deactivated"}.`,
@@ -179,6 +191,8 @@ export default function ProvisioningProfileDetailsPage() {
       await provisioningProfilesService.updateProfile(id, {
         name: name.trim(),
         reimbursement_type: reimbursementType.trim(),
+        catalog_product_types:
+          reimbursementType === "BUNDLE" ? selectedBundleCategories : [],
         execution_mode: executionMode,
         funding_account_id: Number(fundingAccountId),
         provider_instance_id: Number(providerInstanceId),
@@ -347,17 +361,97 @@ export default function ProvisioningProfileDetailsPage() {
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
               Reimbursement Logic Layer
             </span>
+
             {isEditing ? (
-              <input
-                type="text"
+              <select
                 value={reimbursementType}
-                onChange={(e) => setReimbursementType(e.target.value)}
+                onChange={(e) => {
+                  setReimbursementType(e.target.value);
+
+                  if (e.target.value !== "BUNDLE") {
+                    setSelectedBundleCategories([]);
+                  }
+                }}
                 className="mt-1 w-full px-2 py-1 bg-white border border-slate-200 rounded-lg text-slate-800 font-semibold outline-none"
-              />
+              >
+                <option value="BUNDLE">Bundle</option>
+                <option value="AIRTIME">Airtime</option>
+              </select>
             ) : (
               <span className="text-slate-900 font-semibold mt-0.5">
                 {profile.reimbursement_type}
               </span>
+            )}
+
+            {(isEditing ? reimbursementType : profile.reimbursement_type) ===
+              "BUNDLE" && (
+              <div className="mt-2">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                  Bundle Categories
+                </span>
+
+                {isEditing ? (
+                  <select
+                    multiple
+                    value={selectedBundleCategories}
+                    onChange={(e) =>
+                      setSelectedBundleCategories(
+                        Array.from(
+                          e.target.selectedOptions,
+                          (option) => option.value,
+                        ),
+                      )
+                    }
+                    className="
+    mt-1
+    w-full
+    px-2
+    py-1
+    bg-white
+    border
+    border-slate-200
+    rounded-lg
+    text-slate-800
+    font-semibold
+    outline-none
+    min-h-[100px]
+  "
+                  >
+                    {bundleCategories.map((category) => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {profile.catalog_product_types &&
+                    profile.catalog_product_types.length > 0 ? (
+                      profile.catalog_product_types.map((category) => (
+                        <span
+                          key={category}
+                          className="
+          px-1.5
+          py-0.5
+          rounded
+          bg-indigo-50
+          border
+          border-indigo-100
+          text-indigo-600
+          text-[10px]
+          font-bold
+          uppercase
+        "
+                        >
+                          {category}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-slate-400">Not configured</span>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </div>
 

@@ -255,15 +255,43 @@ export default function ProvisioningProfilesPage() {
       header: "Reimbursement",
 
       accessor: (item: any) => (
-        <span
-          className="
+        <div className="flex flex-col">
+          <span
+            className="
           text-xs
           font-semibold
           text-slate-700
         "
-        >
-          {item.reimbursement_type}
-        </span>
+          >
+            {item.reimbursement_type}
+          </span>
+
+          {item.reimbursement_type === "BUNDLE" &&
+            Array.isArray(item.catalog_product_types) &&
+            item.catalog_product_types.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1">
+                {item.catalog_product_types.map((category: string) => (
+                  <span
+                    key={category}
+                    className="
+                  px-1.5
+                  py-0.5
+                  rounded
+                  bg-indigo-50
+                  border
+                  border-indigo-100
+                  text-indigo-600
+                  text-[10px]
+                  font-bold
+                  uppercase
+                "
+                  >
+                    {category}
+                  </span>
+                ))}
+              </div>
+            )}
+        </div>
       ),
     },
 

@@ -75,7 +75,7 @@ export default function FundingAccountDetailsPage() {
     try {
       setIsActioning(true);
 
-      await fundingAccountsService.updateAccount(id, {
+      await fundingAccountsService.updateStatus(id, {
         is_active: nextState,
       });
 

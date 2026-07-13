@@ -14,6 +14,7 @@ import { provisioningProfilesService } from "@/services/provisioningProfilesServ
 import { fundingAccountsService } from "@/services/fundingAccountsService";
 import { providerInstanceService } from "@/services/providerInstanceService";
 import { commandService } from "@/services/commandService";
+import { reimbursementsService } from "@/services/reimbursementsService";
 
 interface FundingAccountLookup {
   id: number;
@@ -32,7 +33,11 @@ export default function CreateProvisioningProfilePage() {
 
   // Form State
   const [name, setName] = useState("");
-  const [reimbursementType, setReimbursementType] = useState("");
+  const [reimbursementType, setReimbursementType] = useState("BUNDLE");
+  const [bundleCategories, setBundleCategories] = useState<string[]>([]);
+  const [selectedBundleCategories, setSelectedBundleCategories] = useState<
+    string[]
+  >([]);
   const [executionMode, setExecutionMode] = useState("COMMAND");
   const [fundingAccountId, setFundingAccountId] = useState("");
   const [providerInstanceId, setProviderInstanceId] = useState("");
@@ -57,11 +62,15 @@ export default function CreateProvisioningProfilePage() {
       try {
         setIsLoadingDropdowns(true);
 
-        const [fundingRes, providersRes, commandsRes] = await Promise.all([
-          fundingAccountsService.getAccounts(1, 1000),
-          providerInstanceService.getAll(1, 1000),
-          commandService.getCommands(1, 1000),
-        ]);
+        const [fundingRes, providersRes, commandsRes, categoriesRes] =
+          await Promise.all([
+            fundingAccountsService.getAccounts(1, 1000),
+            providerInstanceService.getAll(1, 1000),
+            commandService.getCommands(1, 1000),
+            reimbursementsService.getBundleCategories(),
+          ]);
+
+        setBundleCategories(categoriesRes?.data ?? []);
 
         setFundingAccounts(fundingRes?.data?.data ?? fundingRes?.data ?? []);
         setProviderInstances(
@@ -94,12 +103,14 @@ export default function CreateProvisioningProfilePage() {
 
     const payload = {
       name: name.trim(),
-      reimbursement_type: reimbursementType.trim(),
+      reimbursement_type: reimbursementType,
+      catalog_product_types:
+        reimbursementType === "BUNDLE" ? selectedBundleCategories : [],
       execution_mode: executionMode,
       funding_account_id: Number(fundingAccountId),
-      provider_instance_id: parseInt(providerInstanceId, 10),
-      command_id: commandId ? parseInt(commandId, 10) : null,
-      debit_command_id: debitCommandId ? parseInt(debitCommandId, 10) : null,
+      provider_instance_id: Number(providerInstanceId),
+      command_id: commandId ? Number(commandId) : null,
+      debit_command_id: debitCommandId ? Number(debitCommandId) : null,
       is_active: isActive,
     };
 
@@ -209,14 +220,52 @@ export default function CreateProvisioningProfilePage() {
             <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
               Radio Reimbursement Type <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              required
-              placeholder="e.g. POSTPAID, PREPAID"
+            <select
               value={reimbursementType}
-              onChange={(e) => setReimbursementType(e.target.value)}
+              onChange={(e) => {
+                setReimbursementType(e.target.value);
+
+                if (e.target.value !== "BUNDLE") {
+                  setSelectedBundleCategories([]);
+                }
+              }}
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 transition-all"
-            />
+            >
+              <option value="BUNDLE">Bundle</option>
+              <option value="AIRTIME">Airtime</option>
+            </select>
+            {reimbursementType === "BUNDLE" && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-600">
+                  Bundle Categories
+                </label>
+
+                <select
+                  multiple
+                  value={selectedBundleCategories}
+                  onChange={(e) =>
+                    setSelectedBundleCategories(
+                      Array.from(
+                        e.target.selectedOptions,
+                        (option) => option.value,
+                      ),
+                    )
+                  }
+                  className="w-full min-h-[180px] bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 transition-all"
+                >
+                  {bundleCategories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+
+                <span className="text-[11px] text-slate-400">
+                  Hold Ctrl (Windows/Linux) or Cmd (macOS) to select multiple
+                  categories.
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-1.5">
