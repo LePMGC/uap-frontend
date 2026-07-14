@@ -40,8 +40,12 @@ export default function CreateProvisioningProfilePage() {
   >([]);
   const [executionMode, setExecutionMode] = useState("COMMAND");
   const [fundingAccountId, setFundingAccountId] = useState("");
-  const [providerInstanceId, setProviderInstanceId] = useState("");
-  const [commandId, setCommandId] = useState("");
+  const [provisioningProviderInstanceId, setProvisioningProviderInstanceId] =
+    useState("");
+  const [provisioningCommandId, setProvisioningCommandId] = useState("");
+  const [debitByProvisioningProvider, setDebitByProvisioningProvider] =
+    useState(true);
+  const [debitProviderInstanceId, setDebitProviderInstanceId] = useState("");
   const [debitCommandId, setDebitCommandId] = useState("");
   const [isActive, setIsActive] = useState(true);
 
@@ -87,18 +91,36 @@ export default function CreateProvisioningProfilePage() {
     loadDependencies();
   }, [showToast]);
 
+  useEffect(() => {
+    if (debitByProvisioningProvider) {
+      setDebitProviderInstanceId("");
+      setDebitCommandId("");
+    }
+  }, [debitByProvisioningProvider]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (
       !name.trim() ||
       !reimbursementType.trim() ||
       !fundingAccountId ||
-      !providerInstanceId
+      !provisioningProviderInstanceId ||
+      !provisioningCommandId
     ) {
       return showToast(
-        "Please complete all required infrastructure parameters.",
+        "Please complete all required provisioning parameters.",
         "error",
       );
+    }
+
+    if (!debitByProvisioningProvider) {
+      if (!debitProviderInstanceId) {
+        return showToast("Please select the debit provider instance.", "error");
+      }
+
+      if (!debitCommandId) {
+        return showToast("Please select the debit command.", "error");
+      }
     }
 
     const payload = {
@@ -108,9 +130,25 @@ export default function CreateProvisioningProfilePage() {
         reimbursementType === "BUNDLE" ? selectedBundleCategories : [],
       execution_mode: executionMode,
       funding_account_id: Number(fundingAccountId),
-      provider_instance_id: Number(providerInstanceId),
-      command_id: commandId ? Number(commandId) : null,
-      debit_command_id: debitCommandId ? Number(debitCommandId) : null,
+      provisioning_provider_instance_id: Number(provisioningProviderInstanceId),
+
+      provisioning_command_id: provisioningCommandId
+        ? Number(provisioningCommandId)
+        : null,
+
+      debit_using_provisioning_provider: debitByProvisioningProvider,
+
+      debit_provider_instance_id: debitByProvisioningProvider
+        ? null
+        : debitProviderInstanceId
+          ? Number(debitProviderInstanceId)
+          : null,
+
+      debit_command_id: debitByProvisioningProvider
+        ? null
+        : debitCommandId
+          ? Number(debitCommandId)
+          : null,
       is_active: isActive,
     };
 
@@ -271,90 +309,221 @@ export default function CreateProvisioningProfilePage() {
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
               Execution Mode Runtime
+              <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
+
+            <select
               required
               value={executionMode}
               onChange={(e) => setExecutionMode(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800 outline-none focus:border-indigo-500 transition-all"
-            />
+              className="
+      w-full
+      bg-slate-50
+      border
+      border-slate-200
+      rounded-xl
+      px-3
+      py-2
+      text-xs
+      font-semibold
+      text-slate-800
+      outline-none
+      focus:border-indigo-500
+      focus:ring-2
+      focus:ring-indigo-100
+      transition-all
+      cursor-pointer
+    "
+            >
+              <option value="COMMAND">
+                COMMAND - Execute provider command immediately
+              </option>
+
+              <option value="BATCH">
+                BATCH - Queue execution for batch processing
+              </option>
+            </select>
+
+            <p className="text-[11px] text-slate-400">
+              Defines how provisioning requests are dispatched to the execution
+              engine.
+            </p>
           </div>
         </div>
 
-        {/* Integration Hardware Engine IDs */}
-        <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-4">
-          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-            <Cpu className="h-3.5 w-3.5 text-slate-400" /> Pipeline Control
-            Identifiers
+        {/* Pipeline Configuration */}
+        <div className="bg-slate-50 rounded-2xl border border-slate-100 p-5 space-y-5">
+          <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+            <Cpu className="h-4 w-4" />
+            Pipeline Configuration
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-bold text-slate-500">
-                Provider Instance <span className="text-red-500">*</span>
-              </label>
-              <select
-                required
-                value={providerInstanceId}
-                onChange={(e) => setProviderInstanceId(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 transition-all"
-              >
-                <option value="">
-                  {isLoadingDropdowns
-                    ? "Fetching relations..."
-                    : "-- Select Provider Instance --"}
-                </option>
-                {providerInstances.map((pi) => (
-                  <option key={pi.id} value={pi.id}>
-                    {pi.name} (ID: {pi.id})
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Provisioning */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+              <div>
+                <h3 className="text-sm font-bold text-slate-800">
+                  Provisioning
+                </h3>
+
+                <p className="text-xs text-slate-500 mt-1">
+                  Configure the provider and command responsible for executing
+                  the provisioning request.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-bold text-slate-500">
+                  Provider Instance <span className="text-red-500">*</span>
+                </label>
+
+                <select
+                  required
+                  value={provisioningProviderInstanceId}
+                  onChange={(e) =>
+                    setProvisioningProviderInstanceId(e.target.value)
+                  }
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 transition-all"
+                >
+                  <option value="">
+                    {isLoadingDropdowns
+                      ? "Fetching provider instances..."
+                      : "-- Select Provider Instance --"}
                   </option>
-                ))}
-              </select>
+
+                  {providerInstances.map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-bold text-slate-500">
+                  Provisioning Command <span className="text-red-500">*</span>
+                </label>
+
+                <select
+                  required
+                  value={provisioningCommandId}
+                  onChange={(e) => setProvisioningCommandId(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 transition-all"
+                >
+                  <option value="">
+                    {isLoadingDropdowns
+                      ? "Fetching commands..."
+                      : "-- Unset (NULL) --"}
+                  </option>
+
+                  {commands.map((command) => (
+                    <option key={command.id} value={command.id}>
+                      {command.name || `Command #${command.id}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-bold text-slate-500">
-                Command (Optional)
-              </label>
-              <select
-                value={commandId}
-                onChange={(e) => setCommandId(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 transition-all"
-              >
-                <option value="">
-                  {isLoadingDropdowns
-                    ? "Fetching relations..."
-                    : "-- Unset (NULL) --"}
-                </option>
-                {commands.map((cmd) => (
-                  <option key={cmd.id} value={cmd.id}>
-                    {cmd.name || `Command #${cmd.id}`}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Debit */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Debit</h3>
 
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-bold text-slate-500">
-                Debit Command (Optional)
-              </label>
-              <select
-                value={debitCommandId}
-                onChange={(e) => setDebitCommandId(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 transition-all"
+                  <p className="text-xs text-slate-500 mt-1">
+                    Configure how reimbursement debit requests are executed.
+                  </p>
+                </div>
+
+                <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={debitByProvisioningProvider}
+                    onChange={(e) =>
+                      setDebitByProvisioningProvider(e.target.checked)
+                    }
+                    className="rounded border-slate-300"
+                  />
+                  Use provisioning provider
+                </label>
+              </div>
+
+              <div
+                className={cn(
+                  "space-y-4 transition-all",
+                  debitByProvisioningProvider &&
+                    "opacity-50 pointer-events-none",
+                )}
               >
-                <option value="">
-                  {isLoadingDropdowns
-                    ? "Fetching relations..."
-                    : "-- Unset (NULL) --"}
-                </option>
-                {commands.map((cmd) => (
-                  <option key={cmd.id} value={cmd.id}>
-                    {cmd.name || `Command #${cmd.id}`}
-                  </option>
-                ))}
-              </select>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-bold text-slate-500">
+                    Debit Provider Instance
+                    {!debitByProvisioningProvider && (
+                      <span className="text-red-500"> *</span>
+                    )}
+                  </label>
+
+                  <select
+                    required={!debitByProvisioningProvider}
+                    disabled={debitByProvisioningProvider}
+                    value={debitProviderInstanceId}
+                    onChange={(e) => setDebitProviderInstanceId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 transition-all disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    <option value="">
+                      {isLoadingDropdowns
+                        ? "Fetching provider instances..."
+                        : "-- Unset (NULL) --"}
+                    </option>
+
+                    {providerInstances.map((provider) => (
+                      <option key={provider.id} value={provider.id}>
+                        {provider.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-bold text-slate-500">
+                    Debit Command
+                    {!debitByProvisioningProvider && (
+                      <span className="text-red-500"> *</span>
+                    )}
+                  </label>
+
+                  <select
+                    required={!debitByProvisioningProvider}
+                    disabled={debitByProvisioningProvider}
+                    value={debitCommandId}
+                    onChange={(e) => setDebitCommandId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 transition-all disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    <option value="">
+                      {isLoadingDropdowns
+                        ? "Fetching commands..."
+                        : "-- Unset (NULL) --"}
+                    </option>
+
+                    {commands.map((command) => (
+                      <option key={command.id} value={command.id}>
+                        {command.name || `Command #${command.id}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {debitByProvisioningProvider && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+                  <p className="text-[11px] text-blue-700">
+                    Debit operations will reuse the provisioning provider
+                    instance and provisioning command. Separate debit
+                    configuration is ignored.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -341,24 +341,60 @@ export default function ProvisioningProfilesPage() {
     },
 
     {
-      header: "Provider",
+      header: "Provisioning",
 
       accessor: (item: any) => (
-        <div
-          className="
-          flex
-          items-center
-          gap-1.5
-          text-xs
-          text-slate-600
-        "
-        >
-          <Server className="h-3.5 w-3.5" />
+        <div className="flex flex-col text-xs">
+          <span className="font-semibold text-slate-700">
+            {item.provisioning_provider_instance?.name ?? "-"}
+          </span>
 
-          {item.provider_instance.name}
+          <span className="text-[10px] text-slate-400">
+            {item.provisioning_command?.name ?? "No command"}
+          </span>
         </div>
       ),
     },
+
+    /*{
+      header: "Debit",
+
+      accessor: (item: any) => {
+        if (item.debit_by_provisioning_provider) {
+          return (
+            <span
+              className="
+            inline-flex
+            items-center
+            px-2
+            py-0.5
+            rounded-full
+            bg-emerald-50
+            border
+            border-emerald-100
+            text-[10px]
+            font-bold
+            text-emerald-700
+          "
+            >
+              Uses Provisioning Provider
+            </span>
+          );
+        }
+
+        return (
+          <div className="flex flex-col text-xs">
+            <span className="font-semibold text-slate-700">
+              {item.debit_provider_instance?.name ?? "-"}
+            </span>
+
+            <span className="text-[10px] text-slate-400">
+              {item.debit_command?.name ?? "No command"}
+            </span>
+          </div>
+        );
+      },
+    },*/
 
     {
       header: "Status",
