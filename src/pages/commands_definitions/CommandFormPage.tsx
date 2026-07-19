@@ -13,10 +13,10 @@ import { commandService } from "@/services/commandService";
 import { useToastStore } from "@/hooks/useToastStore";
 import { cn } from "@/lib/utils";
 import { ParameterTree } from "@/components/management/ParameterTree";
-import { parseUcipXml } from "@/utils/payloadParsers";
 import { ProtocolEditor } from "@/components/management/ProtocolEditor";
 import { useAuthStore } from "@/store/authStore";
 import { PERM } from "@/types/auth";
+import { parseUcipXml, parseLeapUrl } from "@/utils/payloadParsers";
 
 export default function CommandFormPage() {
   const { id } = useParams();
@@ -74,9 +74,28 @@ export default function CommandFormPage() {
     );
   }, [formData.category_slug, userPermissions, isEdit]);
 
+  const payloadType = useMemo<"xml" | "url" | "mml" | "binary">(() => {
+    const slug = formData.category_slug?.toLowerCase() || "";
+
+    if (slug.includes("ucip")) return "xml";
+    if (slug.includes("leap")) return "url";
+    if (slug.includes("mml")) return "mml";
+
+    return "binary";
+  }, [formData.category_slug]);
+
   const visualizedParameters = useMemo(() => {
-    return parseUcipXml(formData.request_payload);
-  }, [formData.request_payload]);
+    switch (payloadType) {
+      case "xml":
+        return parseUcipXml(formData.request_payload);
+
+      case "url":
+        return parseLeapUrl(formData.request_payload);
+
+      default:
+        return [];
+    }
+  }, [payloadType, formData.request_payload]);
 
   useEffect(() => {
     const initPage = async () => {
@@ -376,7 +395,7 @@ export default function CommandFormPage() {
               >
                 <ProtocolEditor
                   template={formData.request_payload || ""}
-                  language={getCategoryFormat(formData.category_slug)}
+                  language={payloadType}
                   onChange={(val: any) => {
                     if (canModify) {
                       setFormData({ ...formData, request_payload: val });
@@ -387,6 +406,7 @@ export default function CommandFormPage() {
             ) : (
               <ParameterTree
                 parameters={visualizedParameters}
+                payloadType={payloadType}
                 onChange={() => {}}
               />
             )}

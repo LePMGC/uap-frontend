@@ -77,3 +77,27 @@ const parseMembers = (structNode: Element): any[] => {
 
   return params;
 };
+
+export function parseLeapUrl(url: string) {
+  if (!url) return [];
+
+  try {
+    const parsed = new URL(url);
+
+    let id = 0;
+
+    return [...parsed.searchParams.entries()].map(([key, value]) => ({
+      id: ++id,
+
+      name: key,
+
+      label: value,
+
+      type: "string",
+
+      children: [],
+    }));
+  } catch {
+    return [];
+  }
+}

@@ -3,7 +3,7 @@ import Editor from "@monaco-editor/react";
 
 interface ProtocolEditorProps {
   template: string;
-  language: "xml" | "mml" | "binary";
+  language: "xml" | "url" | "json" | "mml" | "binary";
   onChange: (value: string | undefined) => void;
 }
 
@@ -17,8 +17,16 @@ export function ProtocolEditor({
     switch (lang) {
       case "xml":
         return "xml";
+
+      case "json":
+        return "json";
+
+      case "url":
+        return "plaintext";
+
       case "mml":
-        return "plaintext"; // MML is often custom, plaintext works best
+        return "plaintext";
+
       default:
         return "plaintext";
     }

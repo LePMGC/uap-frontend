@@ -11,11 +11,14 @@ import { SuccessModal } from "@/components/batch-jobs/SuccessModal";
 import { useToastStore } from "@/hooks/useToastStore";
 import { commandService } from "@/services/commandService";
 import { batchJobsService } from "@/services/batchJobsService";
+import { FailedModal } from "@/components/batch-jobs/FailedModal";
 
 export default function CreateBatchJobPage() {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [isFailedModalOpen, setIsFailedModalOpen] = useState(false);
+  const [failedChecks, setFailedChecks] = useState<any[]>([]);
   const [createdJobId, setCreatedJobId] = useState("");
   const [commandParams, setCommandParams] = useState([]);
   const { showToast } = useToastStore();
@@ -112,10 +115,33 @@ export default function CreateBatchJobPage() {
       }
     } catch (error: any) {
       console.error("Creation failed:", error);
-      showToast(
-        error.response?.data?.message || "Failed to create batch job",
-        "error",
-      );
+      const response = error.response?.data;
+
+      /*
+      |--------------------------------------------------------------------------
+      | Batch readiness failure
+      |--------------------------------------------------------------------------
+      */
+
+      if (
+        response?.checks &&
+        response?.message ===
+          "The platform is not ready to create this batch job."
+      ) {
+        setFailedChecks(response.checks);
+
+        setIsFailedModalOpen(true);
+
+        return;
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Generic failure
+      |--------------------------------------------------------------------------
+      */
+
+      showToast(response?.message || "Failed to create batch job", "error");
     }
   };
 
@@ -216,6 +242,11 @@ export default function CreateBatchJobPage() {
         isOpen={isSuccessModalOpen}
         jobId={createdJobId}
         jobName={formData.name}
+      />
+      <FailedModal
+        isOpen={isFailedModalOpen}
+        checks={failedChecks}
+        onClose={() => setIsFailedModalOpen(false)}
       />
     </div>
   );

@@ -9,6 +9,12 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+type ParameterTreeProps = {
+  parameters: any[];
+  payloadType: string;
+  onChange: (data: any[]) => void;
+};
+
 export const ParameterRow = ({
   param,
   depth,
@@ -100,22 +106,22 @@ export const ParameterRow = ({
   );
 };
 
-export function ParameterTree({
-  parameters,
-}: {
-  parameters: any[];
-  onChange: (data: any[]) => void;
-}) {
+export function ParameterTree({ parameters, payloadType }: ParameterTreeProps) {
   return (
     <div className="space-y-1">
+      {/** 
       <div className="flex items-center justify-between mb-4 px-2">
         <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-          Command Parameter Tree
+          {payloadType === "xml" && "XML Parameter Tree"}
+          {payloadType === "url" && "URL Query Parameters"}
+          {payloadType === "mml" && "MML Parameters"}
+          {payloadType === "binary" && "Command Parameters"}
         </span>
+
         <button className="bg-white border border-slate-200 text-slate-700 px-3 py-1 rounded-lg text-[10px] font-bold flex items-center gap-2 hover:bg-slate-50 transition-all">
           <Plus className="h-3.5 w-3.5" /> Add Root Parameter
-        </button>
-      </div>
+        </button> 
+      </div> */}
 
       <div className="bg-slate-50/50 rounded-2xl border border-slate-200 p-4">
         {parameters.length === 0 ? (
