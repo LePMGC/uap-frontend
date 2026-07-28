@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -27,10 +27,15 @@ import {
   ThumbsUp,
   ThumbsDown,
   Ban,
+  Cpu,
+  Terminal,
+  AlertTriangle,
+  Bot,
 } from "lucide-react";
 import {
   reimbursementsService,
-  type ReimbursementItem,
+  type ReimbursementItem as BaseReimbursementItem,
+  type ReimbursementAttachment,
 } from "@/services/reimbursementsService";
 import { useToastStore } from "@/hooks/useToastStore";
 import { useAuthStore } from "@/store/authStore";
@@ -62,6 +67,59 @@ interface BackendBundleItem {
   validity_units: string;
 }
 
+interface ProvisioningMetrics {
+  total_records?: number;
+  processed_count?: number;
+  success_count?: number;
+  failure_count?: number;
+  progress_pct?: number;
+}
+
+interface ProvisioningReports {
+  summary_url?: string | null;
+  errors_csv?: string | null;
+  full_report?: string | null;
+}
+
+interface ProvisioningError {
+  row?: number;
+  identifier?: string;
+  reason?: string;
+}
+
+interface ProvisioningExecution {
+  id: number;
+  status: string;
+  execution_type: "COMMAND" | "BATCH";
+  started_at?: string | null;
+  completed_at?: string | null;
+  metrics?: ProvisioningMetrics | null;
+  errors?: ProvisioningError[];
+  reports?: ProvisioningReports | null;
+}
+
+interface ReimbursementItem extends Omit<
+  BaseReimbursementItem,
+  | "rejection_reason"
+  | "status"
+  | "attachments"
+  | "input_file_url"
+  | "capabilities"
+  | "input_file_records_count"
+> {
+  status?: string;
+  provisioning_execution?: ProvisioningExecution | null;
+  attachments?: ReimbursementAttachment[];
+  bulk_metrics?: IngestionMetrics;
+  input_file_url?: string | null;
+  input_file_records_count?: number | null;
+  rejection_reason?: string | null;
+  capabilities?: {
+    can_approve?: boolean;
+    can_cancel?: boolean;
+  };
+}
+
 export default function ReimbursementDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -77,18 +135,29 @@ export default function ReimbursementDetailsPage() {
     [currentUser],
   );
 
-  const canModify =
-    userPermissions.includes(PERM.CREATE_SINGLE_REIMBURSEMENTS) ||
-    userPermissions.includes(PERM.CREATE_BULK_REIMBURSEMENTS);
+  const isTerminalStatus = useCallback((status?: string) => {
+    if (!status) return false;
+    return ["rejected", "cancelled", "canceled", "provisioned"].includes(
+      status.toLowerCase(),
+    );
+  }, []);
 
-  const canApproveReject =
-    userPermissions.includes(PERM.APPROVE_TIER3_REIMBURSEMENTS) ||
-    userPermissions.includes(PERM.APPROVE_TIER2_REIMBURSEMENTS) ||
-    userPermissions.includes(PERM.APPROVE_TIER1_REIMBURSEMENTS);
-  const canCancel =
-    userPermissions.includes(PERM.CANCEL_REIMBURSEMENTS) || canModify;
+  const canModify = useMemo(
+    () =>
+      userPermissions.includes(PERM.CREATE_SINGLE_REIMBURSEMENTS) ||
+      userPermissions.includes(PERM.CREATE_BULK_REIMBURSEMENTS),
+    [userPermissions],
+  );
 
-  // States Workspace
+  const canApproveReject = useMemo(
+    () =>
+      userPermissions.includes(PERM.APPROVE_TIER3_REIMBURSEMENTS) ||
+      userPermissions.includes(PERM.APPROVE_TIER2_REIMBURSEMENTS) ||
+      userPermissions.includes(PERM.APPROVE_TIER1_REIMBURSEMENTS),
+    [userPermissions],
+  );
+
+  // Main Workspace States
   const [loading, setLoading] = useState<boolean>(true);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [isActioning, setIsActioning] = useState<boolean>(false);
@@ -100,7 +169,7 @@ export default function ReimbursementDetailsPage() {
   const [isCancelModalOpen, setIsCancelModalOpen] = useState<boolean>(false);
   const [rejectionReason, setRejectionReason] = useState<string>("");
 
-  // Form Parameters
+  // Form Fields
   const [ticketId, setTicketId] = useState<string>("");
   const [description, setDescription] = useState<string>("");
   const [reimbursementType, setReimbursementType] = useState<
@@ -118,12 +187,11 @@ export default function ReimbursementDetailsPage() {
     { id: string; name: string }[]
   >([]);
 
-  // Live Catalog Back-End Sync Layers
+  // Catalog State Layer
   const [categories, setCategories] = useState<string[]>([]);
   const [bundles, setBundles] = useState<BackendBundleItem[]>([]);
-  const [isLoadingCatalog, setIsLoadingCatalog] = useState(false);
 
-  // Bulk Staging Overwrites
+  // Bulk Ingestion State
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isProcessingFile, setIsProcessingFile] = useState<boolean>(false);
   const [currentFileReferenceId, setCurrentFileReferenceId] = useState<
@@ -132,7 +200,6 @@ export default function ReimbursementDetailsPage() {
   const [newFileReferenceId, setNewFileReferenceId] = useState<string | null>(
     null,
   );
-
   const [bulkMetrics, setBulkMetrics] = useState<IngestionMetrics>({
     total: 0,
     valid: 0,
@@ -140,12 +207,11 @@ export default function ReimbursementDetailsPage() {
   });
   const [bulkErrors, setBulkErrors] = useState<ValidationErrorLog[]>([]);
 
+  // Downloads & Actions Loading
   const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] =
     useState<boolean>(false);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
   const [isDownloadingInput, setIsDownloadingInput] = useState<boolean>(false);
-
-  // Dropdown Category Selectors
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isOpenDropdown, setIsOpenDropdown] = useState<boolean>(false);
@@ -153,6 +219,7 @@ export default function ReimbursementDetailsPage() {
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
+  // Outside click handler
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -172,35 +239,32 @@ export default function ReimbursementDetailsPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Fetch Live Bundle Catalog Data from the Back-End
+  // Fetch Live Catalog
   useEffect(() => {
+    let isMounted = true;
     async function loadCatalog() {
       try {
-        setIsLoadingCatalog(true);
         const response = await reimbursementsService.getBundles();
-
-        if (!response.success) {
-          throw new Error("Unable to load catalog");
-        }
+        if (!response.success || !isMounted) return;
 
         const backendBundles: BackendBundleItem[] = response.data.bundles ?? [];
-        setBundles(backendBundles);
-
         const officialCategories = response.data.categories ?? [];
+
+        setBundles(backendBundles);
         setCategories(officialCategories);
 
         if (officialCategories.length > 0 && !selectedCategory) {
           setSelectedCategory(officialCategories[0]);
         }
       } catch (err) {
-        console.error(err);
         showToast("Unable to load reimbursement catalog.", "error");
-      } finally {
-        setIsLoadingCatalog(false);
       }
     }
 
     loadCatalog();
+    return () => {
+      isMounted = false;
+    };
   }, [showToast]);
 
   const filteredBundles = useMemo(() => {
@@ -215,12 +279,10 @@ export default function ReimbursementDetailsPage() {
 
   const selectedBundleName = useMemo(() => {
     const found = bundles.find((b) => String(b.id) === String(targetProductId));
-    if (!found) {
-      return "Choose explicit product schema...";
-    }
+    if (!found) return "Choose explicit product schema...";
 
     return (
-      <span className="flex items-center gap-3 text-xs">
+      <span className="flex items-center gap-3 text-xs truncate">
         <span className="font-bold text-slate-800">{found.name}</span>
         <span className="text-slate-400">|</span>
         <span className="font-mono text-slate-600">#{found.offer_id}</span>
@@ -230,7 +292,6 @@ export default function ReimbursementDetailsPage() {
     );
   }, [bundles, targetProductId]);
 
-  // Handle setting category once details match live catalog definitions
   useEffect(() => {
     if (record?.target_product_id && bundles.length > 0) {
       const matchingBundle = bundles.find(
@@ -242,17 +303,14 @@ export default function ReimbursementDetailsPage() {
     }
   }, [record?.target_product_id, bundles]);
 
-  const fetchDetails = async () => {
+  const fetchDetails = useCallback(async () => {
     if (!id) return;
     try {
       setLoading(true);
       const response = await reimbursementsService.getReimbursementDetails(id);
       const data = (response as any).data || response;
 
-      if (!data)
-        throw new Error(
-          "Missing structural item block wrapper data exceptions.",
-        );
+      if (!data) throw new Error("Missing response data structure.");
 
       setRecord(data);
       setTicketId(data.ticket_id);
@@ -284,25 +342,29 @@ export default function ReimbursementDetailsPage() {
           })),
         );
       }
-      if (data.bulk_metrics) {
-        setBulkMetrics(data.bulk_metrics);
-      } else {
-        setBulkMetrics({ total: 0, valid: 0, invalid: 0 });
-      }
+
+      const recordCount =
+        data.input_file_records_count ?? data.bulk_metrics?.total ?? 0;
+      setBulkMetrics(
+        data.bulk_metrics || {
+          total: recordCount,
+          valid: recordCount,
+          invalid: 0,
+        },
+      );
     } catch (err) {
-      console.error(err);
       showToast("Failed to retrieve structural details.", "error");
       navigate("/reimbursements");
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, navigate, showToast]);
 
   useEffect(() => {
     fetchDetails();
-  }, [id]);
+  }, [fetchDetails]);
 
-  // --- WORKFLOW TRANSACTIONS INTERFACES ---
+  // Actions
   const handleApproveSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return;
@@ -314,10 +376,7 @@ export default function ReimbursementDetailsPage() {
       setIsApproveModalOpen(false);
       await fetchDetails();
     } catch (error) {
-      showToast(
-        "An error occurred during approval configuration layout updates.",
-        "error",
-      );
+      showToast("An error occurred during approval layout updates.", "error");
     } finally {
       setIsActioning(false);
     }
@@ -338,7 +397,7 @@ export default function ReimbursementDetailsPage() {
       setRejectionReason("");
       await fetchDetails();
     } catch (error) {
-      showToast("Failed to update rejection metrics logs.", "error");
+      showToast("Failed to update rejection logs.", "error");
     } finally {
       setIsActioning(false);
     }
@@ -369,7 +428,7 @@ export default function ReimbursementDetailsPage() {
       showToast("Input spreadsheet downloaded successfully.", "success");
     } catch (error) {
       showToast(
-        "Session file fetch unauthorized or missing on storage layers.",
+        "Session file fetch unauthorized or missing on storage.",
         "error",
       );
     } finally {
@@ -387,10 +446,7 @@ export default function ReimbursementDetailsPage() {
         "success",
       );
     } catch (error) {
-      showToast(
-        "Failed to generate download template format data stream.",
-        "error",
-      );
+      showToast("Failed to generate download template format stream.", "error");
     } finally {
       setIsDownloading(false);
     }
@@ -452,7 +508,7 @@ export default function ReimbursementDetailsPage() {
         const response =
           await reimbursementsService.uploadEvidenceAttachment(file);
         const serverPayload = (response as any).data || response;
-        if (serverPayload && serverPayload.id) {
+        if (serverPayload?.id) {
           newItems.push({
             id: String(serverPayload.id),
             name: serverPayload.file_name,
@@ -523,7 +579,7 @@ export default function ReimbursementDetailsPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const renderStatusBadge = (status?: string) => {
     const config: Record<
       string,
       { bg: string; text: string; icon: any; label: string }
@@ -540,6 +596,12 @@ export default function ReimbursementDetailsPage() {
         icon: CheckCircle2,
         label: "Approved",
       },
+      provisioned: {
+        bg: "bg-emerald-50 border-emerald-200",
+        text: "text-emerald-700",
+        icon: CheckCircle2,
+        label: "Provisioned",
+      },
       success: {
         bg: "bg-emerald-50 border-emerald-200",
         text: "text-emerald-700",
@@ -552,14 +614,26 @@ export default function ReimbursementDetailsPage() {
         icon: XCircle,
         label: "Rejected",
       },
+      cancelled: {
+        bg: "bg-rose-50 border-rose-200",
+        text: "text-rose-700",
+        icon: XCircle,
+        label: "Cancelled",
+      },
+      canceled: {
+        bg: "bg-rose-50 border-rose-200",
+        text: "text-rose-700",
+        icon: XCircle,
+        label: "Canceled",
+      },
       failed: {
-        bg: "bg-red-50 border-red-200",
-        text: "text-red-700",
+        bg: "bg-rose-50 border-rose-200",
+        text: "text-rose-700",
         icon: AlertCircle,
         label: "Execution Failed",
       },
     };
-    const c = config[status] || config.pending;
+    const c = config[status?.toLowerCase() || ""] || config.pending;
     const Icon = c.icon;
     return (
       <div
@@ -575,6 +649,181 @@ export default function ReimbursementDetailsPage() {
     );
   };
 
+  function renderFileZone() {
+    if (isProcessingFile) {
+      return (
+        <div className="border border-dashed border-indigo-200 bg-indigo-50/20 rounded-xl p-6 text-center flex flex-col items-center justify-center gap-2">
+          <div className="h-5 w-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs font-bold text-indigo-700">
+            Streaming and validating file structure arrays...
+          </span>
+        </div>
+      );
+    }
+
+    if (!uploadedFile) {
+      return (
+        <div className="flex flex-col gap-2">
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              if (e.dataTransfer.files?.[0])
+                handleFileIngestion(e.dataTransfer.files[0]);
+            }}
+            className="border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-white rounded-xl p-6 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1.5 relative"
+          >
+            <input
+              type="file"
+              accept=".csv, .txt, .xlsx, .xls"
+              onChange={(e) => {
+                if (e.target.files?.[0]) handleFileIngestion(e.target.files[0]);
+              }}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 shadow-sm">
+              <UploadCloud className="h-4 w-4" />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-slate-700 block">
+                Drag & drop spreadsheet revision matrix, or browse local volumes
+              </span>
+              <span className="text-[10px] text-slate-400 font-medium">
+                Limits layout specifications: Max structural allowance 10MB
+              </span>
+            </div>
+          </div>
+
+          <div className="flex justify-end relative" ref={templateDropdownRef}>
+            <button
+              type="button"
+              disabled={isDownloading}
+              onClick={() => setIsTemplateDropdownOpen(!isTemplateDropdownOpen)}
+              className="text-[10px] font-bold text-indigo-600 flex items-center gap-1 bg-white px-2.5 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-50"
+            >
+              <Download className="h-3 w-3" />
+              {isDownloading
+                ? "Exporting..."
+                : "Export Blank Template Schema"}{" "}
+              <ChevronDown className="h-2.5 w-2.5" />
+            </button>
+
+            {isTemplateDropdownOpen && (
+              <div className="absolute right-0 bottom-full mb-1 bg-white border border-slate-200 shadow-xl rounded-lg w-40 py-1 z-50 animate-in fade-in slide-in-from-bottom-1 duration-100">
+                {(["xlsx", "csv", "txt"] as TemplateFormat[]).map((fmt) => (
+                  <button
+                    key={fmt}
+                    type="button"
+                    onClick={() => {
+                      handleCurrentSubscriberDownload(fmt);
+                      setIsTemplateDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 block transition-colors"
+                  >
+                    Export .{fmt.toUpperCase()} Format
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col gap-3 bg-white p-3 border border-slate-200 rounded-xl animate-in fade-in duration-200">
+        <div className="p-2 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
+            <FileText className="h-4 w-4 text-indigo-500" />
+            <span className="truncate max-w-[200px]">{uploadedFile.name}</span>
+            <span className="text-[9px] font-mono bg-indigo-50 text-indigo-700 px-2 rounded border border-indigo-100">
+              {newFileReferenceId}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setUploadedFile(null);
+              setNewFileReferenceId(null);
+              setBulkErrors([]);
+            }}
+            className="p-1 text-slate-400 hover:text-red-500 rounded-lg transition-colors"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-bold">
+          <div className="bg-slate-50 rounded-lg p-2 border border-slate-100">
+            <span className="text-[9px] font-bold text-slate-400 block uppercase">
+              Staged Record Rows
+            </span>
+            <span className="text-sm font-black text-slate-700">
+              {bulkMetrics.total}
+            </span>
+          </div>
+          <div className="bg-green-50/40 rounded-lg p-2 border border-green-100">
+            <span className="text-[9px] font-bold text-green-500 block uppercase">
+              Validated Elements
+            </span>
+            <span className="text-sm font-black text-green-700 flex items-center justify-center gap-0.5">
+              <CheckCircle2 className="h-3 w-3 text-green-500" />{" "}
+              {bulkMetrics.valid}
+            </span>
+          </div>
+          <div className="bg-red-50/40 rounded-lg p-2 border border-red-100">
+            <span className="text-[9px] font-bold text-red-500 block uppercase">
+              Rejected Errors
+            </span>
+            <span className="text-sm font-black text-red-700 flex items-center justify-center gap-0.5">
+              <AlertCircle className="h-3 w-3 text-red-500" />{" "}
+              {bulkMetrics.invalid}
+            </span>
+          </div>
+        </div>
+
+        {bulkErrors.length > 0 && (
+          <div className="flex flex-col gap-1 animate-in slide-in-from-top-2 duration-200">
+            <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider block">
+              Ingesting Fault Diagnostics Logs
+            </span>
+            <div className="border border-red-100 rounded-lg overflow-hidden text-[11px] bg-white max-h-40 overflow-y-auto shadow-inner">
+              <table className="w-full border-collapse">
+                <thead className="sticky top-0 bg-red-50 z-10 text-red-700 font-bold text-left">
+                  <tr className="border-b border-red-100">
+                    <th className="p-2 w-16">Row ID</th>
+                    <th className="p-2 w-32">Identifier</th>
+                    <th className="p-2">
+                      Failure Reason Description Framework
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-red-50 text-slate-600 font-medium">
+                  {bulkErrors.map((err, idx) => (
+                    <tr
+                      key={`${err.row}-${idx}`}
+                      className="hover:bg-red-50/20 transition-colors"
+                    >
+                      <td className="p-2 font-bold font-mono text-red-600">
+                        Row {err.row}
+                      </td>
+                      <td className="p-2 font-mono text-slate-500 break-all">
+                        {err.identifier}
+                      </td>
+                      <td className="p-2 text-slate-500 leading-relaxed text-xs">
+                        {err.reason}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="p-8 flex flex-col items-center justify-center min-h-[400px] text-slate-400 text-xs font-semibold gap-2 font-mono animate-pulse">
@@ -585,6 +834,9 @@ export default function ReimbursementDetailsPage() {
   }
 
   if (!record) return null;
+
+  const terminalState = isTerminalStatus(record.status);
+  const provExec = record.provisioning_execution;
 
   return (
     <div className="p-8 max-w-[1600px] mx-auto space-y-6 animate-in fade-in duration-500 relative">
@@ -601,10 +853,13 @@ export default function ReimbursementDetailsPage() {
             <div className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">
               Reimbursement Details
             </div>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900">
+              Ticket #{record.ticket_id || record.id}
+            </h1>
           </div>
         </div>
 
-        {/* Workflow State Validation Matrix Actions Menu Controls */}
+        {/* Action Toolbar */}
         <div className="flex flex-wrap items-center gap-2">
           {record.status === "pending" && (
             <>
@@ -643,7 +898,7 @@ export default function ReimbursementDetailsPage() {
             </>
           )}
 
-          {record.status === "pending" && canModify && (
+          {!terminalState && canModify && (
             <div className="flex items-center gap-2">
               {isEditing ? (
                 <>
@@ -691,7 +946,6 @@ export default function ReimbursementDetailsPage() {
               Primary Parameter Details
             </h2>
 
-            {/* Injected Active Rejection Note Container */}
             {record.status === "rejected" && record.rejection_reason && (
               <div className="p-4 bg-rose-50 border border-rose-100 text-rose-800 rounded-xl space-y-1 text-xs">
                 <span className="font-bold text-[10px] text-rose-500 uppercase tracking-wide block">
@@ -851,7 +1105,6 @@ export default function ReimbursementDetailsPage() {
               </div>
             </div>
 
-            {/* Target Subscriber MSISDN Input */}
             {!isBulk && (
               <div className="flex flex-col gap-1 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs animate-in fade-in duration-200">
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
@@ -874,7 +1127,6 @@ export default function ReimbursementDetailsPage() {
               </div>
             )}
 
-            {/* Target Allocations Configuration Options */}
             <div className="flex flex-col gap-1 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs">
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
                 <Package className="h-3 w-3 text-indigo-500" /> Bundle / Airtime
@@ -1001,7 +1253,7 @@ export default function ReimbursementDetailsPage() {
                       "None chosen"
                     )
                   ) : (
-                    `AIRTIME AMOUNT: ${amount} `
+                    `AIRTIME AMOUNT: ${amount}`
                   )}
                 </span>
               )}
@@ -1027,7 +1279,7 @@ export default function ReimbursementDetailsPage() {
             </div>
           </div>
 
-          {/* Bulk Matrix File Interface Module */}
+          {/* Bulk Subscribers Management */}
           {isBulk && (
             <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col gap-4">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
@@ -1037,7 +1289,6 @@ export default function ReimbursementDetailsPage() {
                 </h3>
               </div>
 
-              {/* Description Reference + File Action Downloader */}
               <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 bg-slate-50/70 border border-slate-200/60 rounded-xl p-3">
                 <div className="text-xs space-y-1">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
@@ -1045,14 +1296,18 @@ export default function ReimbursementDetailsPage() {
                   </span>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-mono font-bold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-sm">
-                      {newFileReferenceId
-                        ? newFileReferenceId
-                        : currentFileReferenceId || "No active file reference"}
+                      {newFileReferenceId ||
+                        currentFileReferenceId ||
+                        "No active file reference"}
                     </span>
                     <span className="text-[11px] font-bold text-slate-500 bg-slate-200/60 px-2 py-0.5 rounded">
-                      Count:{" "}
+                      {" "}
                       <span className="text-slate-900 font-mono">
-                        {bulkMetrics.total}
+                        {newFileReferenceId
+                          ? bulkMetrics.total
+                          : (record?.input_file_records_count ??
+                            bulkMetrics.total ??
+                            0)}
                       </span>{" "}
                       subscribers
                     </span>
@@ -1071,7 +1326,7 @@ export default function ReimbursementDetailsPage() {
                     onClick={handleSecureInputDownload}
                     className="text-[10px] font-bold text-emerald-600 flex items-center gap-1.5 bg-emerald-50 px-3 py-2 border border-emerald-200/60 rounded-lg hover:bg-emerald-100/70 transition-colors shadow-sm disabled:opacity-50 h-8"
                   >
-                    <FileDown className="h-3.5 w-3.5" />{" "}
+                    <FileDown className="h-3.5 w-3.5" />
                     {isDownloadingInput
                       ? "Streaming..."
                       : "Download Original Input"}
@@ -1079,7 +1334,6 @@ export default function ReimbursementDetailsPage() {
                 )}
               </div>
 
-              {/* Dynamic Bottom Input Dropzones */}
               {isEditing ? (
                 <div className="space-y-3 animate-in fade-in duration-200">
                   {renderFileZone()}
@@ -1093,24 +1347,251 @@ export default function ReimbursementDetailsPage() {
               )}
             </div>
           )}
+
+          {/* Provisioning Execution Details Module */}
+          {provExec && (
+            <div className="bg-slate-50/70 rounded-2xl border border-slate-200 p-6 space-y-6 shadow-sm">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                <h2 className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-800">
+                  <Cpu className="h-4 w-4 text-indigo-600" /> Provisioning
+                  Execution Details
+                </h2>
+                <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-200/80 text-slate-600 uppercase tracking-wide">
+                  Read-Only System Record
+                </span>
+              </div>
+
+              <div className="bg-white rounded-xl border border-slate-200/80 p-5 space-y-6 shadow-sm">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pb-4 border-b border-slate-100 text-xs">
+                  <div>
+                    <span className="text-slate-400 font-bold uppercase text-[10px] block mb-1">
+                      Execution ID
+                    </span>
+                    <p className="font-mono font-bold text-slate-800">
+                      #{provExec.id}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="text-slate-400 font-bold uppercase text-[10px] block mb-1">
+                      Execution Type
+                    </span>
+                    <span className="inline-flex items-center gap-1 font-bold text-slate-800">
+                      {provExec.execution_type === "COMMAND" ? (
+                        <Terminal className="h-3.5 w-3.5 text-indigo-500" />
+                      ) : (
+                        <Layers className="h-3.5 w-3.5 text-purple-500" />
+                      )}
+                      {provExec.execution_type}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-slate-400 font-bold uppercase text-[10px] block mb-1">
+                      Execution Status
+                    </span>
+                    <span
+                      className={cn(
+                        "font-extrabold uppercase px-2.5 py-1 rounded text-[11px] tracking-wider border shadow-sm inline-block",
+                        provExec.status?.toLowerCase() === "failed"
+                          ? "bg-rose-100 text-rose-800 border-rose-300"
+                          : provExec.status?.toLowerCase() === "success" ||
+                              provExec.status?.toLowerCase() === "provisioned"
+                            ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                            : "bg-slate-100 text-slate-800 border-slate-300",
+                      )}
+                    >
+                      {provExec.status}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-slate-400 font-bold uppercase text-[10px] block mb-1">
+                      Timestamps
+                    </span>
+                    <p className="text-[11px] text-slate-600">
+                      <span className="font-semibold">Started:</span>{" "}
+                      {provExec.started_at
+                        ? new Date(provExec.started_at).toLocaleString()
+                        : "N/A"}
+                    </p>
+                    {provExec.completed_at && (
+                      <p className="text-[11px] text-slate-600">
+                        <span className="font-semibold">Completed:</span>{" "}
+                        {new Date(provExec.completed_at).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {provExec.metrics && (
+                  <div className="space-y-3">
+                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Execution Metrics
+                    </h3>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs">
+                      <div>
+                        <span className="text-slate-400 font-medium text-[10px] uppercase">
+                          Total Records
+                        </span>
+                        <p className="text-base font-extrabold text-slate-800">
+                          {provExec.metrics.total_records ?? 0}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-medium text-[10px] uppercase">
+                          Processed Count
+                        </span>
+                        <p className="text-base font-extrabold text-slate-800">
+                          {provExec.metrics.processed_count ?? 0}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-medium text-[10px] uppercase">
+                          Success Count
+                        </span>
+                        <p className="text-base font-extrabold text-emerald-600">
+                          {provExec.metrics.success_count ?? 0}
+                        </p>
+                      </div>
+                      <div
+                        className={cn(
+                          "p-2 rounded-lg transition-colors",
+                          (provExec.metrics.failure_count ?? 0) > 0
+                            ? "bg-rose-50 border border-rose-200"
+                            : "",
+                        )}
+                      >
+                        <span className="text-slate-400 font-medium text-[10px] uppercase">
+                          Failure Count
+                        </span>
+                        <p className="text-base font-extrabold text-rose-600">
+                          {provExec.metrics.failure_count ?? 0}
+                        </p>
+                      </div>
+                    </div>
+
+                    {provExec.execution_type === "BATCH" &&
+                      provExec.metrics.progress_pct !== undefined && (
+                        <div className="space-y-1 pt-1">
+                          <div className="flex justify-between text-[11px] font-semibold text-slate-500">
+                            <span>Batch Execution Progress</span>
+                            <span>{provExec.metrics.progress_pct}%</span>
+                          </div>
+                          <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                            <div
+                              className="bg-indigo-600 h-2 transition-all duration-300"
+                              style={{
+                                width: `${provExec.metrics.progress_pct}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                  </div>
+                )}
+
+                {provExec.reports && (
+                  <div className="space-y-3 pt-2 border-t border-slate-100">
+                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Execution Reports
+                    </h3>
+
+                    <div className="flex flex-wrap gap-3">
+                      {provExec.reports.summary_url && (
+                        <a
+                          href={provExec.reports.summary_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors border border-slate-200"
+                        >
+                          <FileText className="h-3.5 w-3.5 text-slate-500" />{" "}
+                          Summary Report
+                        </a>
+                      )}
+
+                      {provExec.reports.errors_csv && (
+                        <a
+                          href={provExec.reports.errors_csv}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors border border-rose-200"
+                        >
+                          <Download className="h-3.5 w-3.5 text-rose-500" />{" "}
+                          Download Failure Logs (.CSV)
+                        </a>
+                      )}
+
+                      {provExec.reports.full_report && (
+                        <a
+                          href={provExec.reports.full_report}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors border border-indigo-200"
+                        >
+                          <Download className="h-3.5 w-3.5 text-indigo-500" />{" "}
+                          Full Execution Report
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {provExec.errors && provExec.errors.length > 0 && (
+                  <div className="space-y-3 pt-2 border-t border-slate-100">
+                    <h3 className="text-xs font-bold text-rose-600 flex items-center gap-1 uppercase tracking-wider">
+                      <AlertTriangle className="h-3.5 w-3.5" /> Execution
+                      Failure Details
+                    </h3>
+
+                    <div className="border border-rose-200 rounded-xl overflow-hidden bg-rose-50/50 text-xs">
+                      <table className="w-full text-left">
+                        <thead className="bg-rose-100/60 text-rose-800 font-bold border-b border-rose-200">
+                          <tr>
+                            <th className="p-2.5">Row</th>
+                            <th className="p-2.5">Identifier</th>
+                            <th className="p-2.5">Error Reason</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-rose-100 text-slate-700">
+                          {provExec.errors.map((errItem, idx) => (
+                            <tr key={idx}>
+                              <td className="p-2.5 font-mono text-slate-500">
+                                {errItem.row ?? idx + 1}
+                              </td>
+                              <td className="p-2.5 font-mono font-semibold">
+                                {errItem.identifier ?? "N/A"}
+                              </td>
+                              <td className="p-2.5 font-medium text-rose-700">
+                                {errItem.reason ||
+                                  "Unspecified execution failure"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Sidebar Grid */}
+        {/* Sidebar Workspace Components */}
         <div className="lg:col-span-4 flex flex-col gap-6">
-          {/* WORKFLOW TRACKS CARD */}
+          {/* Workflow Stepper */}
           <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm flex flex-col gap-4">
             <div className="flex justify-between items-center border-b border-slate-50 pb-2.5">
               <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest">
                 Workflow Status Tracks
               </h2>
-              {getStatusBadge(record.status)}
+              {renderStatusBadge(record.status)}
             </div>
 
-            {/* VISUAL 2-STEP WORKFLOW TIMELINE */}
             <div className="relative pl-6 space-y-6 before:absolute before:bottom-2 before:top-2 before:left-[7px] before:w-[2px] before:bg-slate-100">
-              {/* STEP 1: SUBMISSION (ALWAYS SUCCESS / COMPLETED) */}
               <div className="relative">
-                {/* Step Indicator Node */}
                 <span className="absolute -left-[23px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 ring-4 ring-white">
                   <CheckCircle2 className="h-2.5 w-2.5 text-white" />
                 </span>
@@ -1141,14 +1622,16 @@ export default function ReimbursementDetailsPage() {
                 </div>
               </div>
 
-              {/* STEP 2: REVIEW CYCLE */}
               <div className="relative">
-                {/* Dynamic Step Indicator Node */}
-                {record.status === "approved" ? (
-                  <span className="absolute -left-[23px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 ring-4 ring-white">
+                {record.status === "approved" ||
+                record.status === "provisioned" ||
+                record.status === "failed" ? (
+                  <span className="absolute -left-[23px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 ring-4 ring-white">
                     <CheckCircle2 className="h-2.5 w-2.5 text-white" />
                   </span>
-                ) : record.status === "rejected" ? (
+                ) : record.status === "rejected" ||
+                  record.status === "cancelled" ||
+                  record.status === "canceled" ? (
                   <span className="absolute -left-[23px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 ring-4 ring-white">
                     <XCircle className="h-2.5 w-2.5 text-white" />
                   </span>
@@ -1163,13 +1646,14 @@ export default function ReimbursementDetailsPage() {
                     Step 2: Operational Governance Review
                   </h4>
 
-                  {record.status === "approved" ||
-                  record.status === "rejected" ? (
+                  {record.status !== "pending" ? (
                     <div
                       className={cn(
                         "mt-1.5 p-2.5 rounded-xl border text-[10px] font-medium space-y-1",
-                        record.status === "approved"
-                          ? "bg-indigo-50/40 border-indigo-100/70"
+                        record.status === "approved" ||
+                          record.status === "provisioned" ||
+                          record.status === "failed"
+                          ? "bg-slate-50 border-slate-100"
                           : "bg-rose-50/40 border-rose-100/70",
                       )}
                     >
@@ -1204,16 +1688,97 @@ export default function ReimbursementDetailsPage() {
                   )}
                 </div>
               </div>
+
+              <div className="relative">
+                {record.status === "provisioned" ||
+                record.status === "success" ||
+                provExec?.status?.toLowerCase() === "success" ? (
+                  <span className="absolute -left-[23px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 ring-4 ring-white">
+                    <CheckCircle2 className="h-2.5 w-2.5 text-white" />
+                  </span>
+                ) : record.status === "failed" ||
+                  provExec?.status?.toLowerCase() === "failed" ? (
+                  <span className="absolute -left-[23px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 ring-4 ring-white">
+                    <AlertCircle className="h-2.5 w-2.5 text-white" />
+                  </span>
+                ) : record.status === "approved" ? (
+                  <span className="absolute -left-[23px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 ring-4 ring-white animate-pulse">
+                    <Clock className="h-2.5 w-2.5 text-white" />
+                  </span>
+                ) : (
+                  <span className="absolute -left-[23px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-slate-200 ring-4 ring-white">
+                    <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                  </span>
+                )}
+
+                <div>
+                  <h4 className="text-[11px] font-bold text-slate-800 uppercase tracking-tight">
+                    Step 3: Provisioning Execution
+                  </h4>
+
+                  {provExec ? (
+                    <div
+                      className={cn(
+                        "mt-1.5 p-2.5 rounded-xl border text-[10px] font-medium space-y-1",
+                        provExec.status?.toLowerCase() === "failed"
+                          ? "bg-rose-50/50 border-rose-200/80"
+                          : "bg-emerald-50/40 border-emerald-100/70",
+                      )}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400 font-bold flex items-center gap-1 uppercase tracking-wider">
+                          <Bot className="h-2.5 w-2.5 text-indigo-500" />{" "}
+                          Executed By
+                        </span>
+                        <span className="font-bold text-slate-700 font-mono">
+                          System Auto-Dispatch
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400 font-bold flex items-center gap-1 uppercase tracking-wider">
+                          <Clock className="h-2.5 w-2.5" /> Executed On
+                        </span>
+                        <span className="font-bold text-slate-600">
+                          {provExec.completed_at || provExec.started_at
+                            ? new Date(
+                                (provExec.completed_at || provExec.started_at)!,
+                              ).toLocaleString()
+                            : "In Progress"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center pt-1 border-t border-slate-100/80 mt-1">
+                        <span className="text-slate-400 font-bold uppercase tracking-wider">
+                          Result Status
+                        </span>
+                        <span
+                          className={cn(
+                            "font-extrabold uppercase px-1.5 py-0.5 rounded text-[9px]",
+                            provExec.status?.toLowerCase() === "failed"
+                              ? "bg-rose-100 text-rose-700"
+                              : "bg-emerald-100 text-emerald-700",
+                          )}
+                        >
+                          {provExec.status}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-1.5 p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-[10px] text-slate-400 font-medium">
+                      Pending system dispatch trigger following review.
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* EVIDENCE DOCUMENTS CARD */}
+          {/* Evidence Attachments Panel */}
           <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm flex flex-col gap-3">
             <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest border-b border-slate-50 pb-2">
               Evidence Documents ({attachments.length})
             </h2>
 
-            {isEditing && (
+            {isEditing && !terminalState && (
               <label className="border border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/20 rounded-xl p-3 text-center cursor-pointer flex flex-col items-center justify-center gap-1 text-[11px] font-bold text-indigo-600 shadow-sm group">
                 <Paperclip className="h-4 w-4 group-hover:scale-110 transition-transform" />
                 {isUploading
@@ -1267,7 +1832,7 @@ export default function ReimbursementDetailsPage() {
                         </a>
                       )}
 
-                      {isEditing && (
+                      {isEditing && !terminalState && (
                         <button
                           type="button"
                           onClick={() => removeAttachment(att.id)}
@@ -1285,7 +1850,7 @@ export default function ReimbursementDetailsPage() {
         </div>
       </div>
 
-      {/* Approve Overlay Dialog Box Modal */}
+      {/* Action Dialog Modals */}
       {isApproveModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4 animate-in fade-in duration-100">
           <div className="bg-white w-full max-w-md rounded-2xl border border-slate-200 p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-100">
@@ -1306,8 +1871,8 @@ export default function ReimbursementDetailsPage() {
             <form onSubmit={handleApproveSubmit} className="space-y-4">
               <div className="text-xs font-medium text-slate-600 leading-relaxed">
                 Are you sure you want to approve this reimbursement allocation
-                context? This operation commits data parameters to the active
-                processing layers.
+                context? This operation commits data parameters to active
+                execution layers.
               </div>
 
               <div className="flex items-center justify-end gap-2 border-t pt-2.5 border-slate-100">
@@ -1331,7 +1896,6 @@ export default function ReimbursementDetailsPage() {
         </div>
       )}
 
-      {/* Rejection Overlay Dialog Box Modal Shell */}
       {isRejectModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4 animate-in fade-in duration-100">
           <div className="bg-white w-full max-w-md rounded-2xl border border-slate-200 p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-100">
@@ -1391,7 +1955,6 @@ export default function ReimbursementDetailsPage() {
         </div>
       )}
 
-      {/* Cancel Overlay Dialog Box Modal */}
       {isCancelModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4 animate-in fade-in duration-100">
           <div className="bg-white w-full max-w-md rounded-2xl border border-slate-200 p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-100">
@@ -1437,177 +2000,4 @@ export default function ReimbursementDetailsPage() {
       )}
     </div>
   );
-
-  function renderFileZone() {
-    if (isProcessingFile) {
-      return (
-        <div className="border border-dashed border-indigo-200 bg-indigo-50/20 rounded-xl p-6 text-center flex flex-col items-center justify-center gap-2">
-          <div className="h-5 w-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-xs font-bold text-indigo-700">
-            Streaming and validating file structure arrays...
-          </span>
-        </div>
-      );
-    }
-
-    if (!uploadedFile) {
-      return (
-        <div className="flex flex-col gap-2">
-          <div
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              if (e.dataTransfer.files?.[0])
-                handleFileIngestion(e.dataTransfer.files[0]);
-            }}
-            className="border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-white rounded-xl p-6 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1.5 relative"
-          >
-            <input
-              type="file"
-              accept=".csv, .txt, .xlsx, .xls"
-              onChange={(e) => {
-                if (e.target.files?.[0]) handleFileIngestion(e.target.files[0]);
-              }}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            />
-            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 shadow-sm">
-              <UploadCloud className="h-4 w-4" />
-            </div>
-            <div>
-              <span className="text-xs font-bold text-slate-700 block">
-                Drag & drop spreadsheet revision matrix, or browse local volumes
-              </span>
-              <span className="text-[10px] text-slate-400 font-medium">
-                Limits layout specifications: Max structural allowance 10MB
-              </span>
-            </div>
-          </div>
-
-          <div className="flex justify-end relative" ref={templateDropdownRef}>
-            <button
-              type="button"
-              disabled={isDownloading}
-              onClick={() => setIsTemplateDropdownOpen(!isTemplateDropdownOpen)}
-              className="text-[10px] font-bold text-indigo-600 flex items-center gap-1 bg-white px-2.5 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-50"
-            >
-              <Download className="h-3 w-3" />{" "}
-              {isDownloading ? "Exporting..." : "Export Blank Template Schema"}{" "}
-              <ChevronDown className="h-2.5 w-2.5" />
-            </button>
-
-            {isTemplateDropdownOpen && (
-              <div className="absolute right-0 bottom-full mb-1 bg-white border border-slate-200 shadow-xl rounded-lg w-40 py-1 z-50 animate-in fade-in slide-in-from-bottom-1 duration-100">
-                {(["xlsx", "csv", "txt"] as TemplateFormat[]).map((fmt) => (
-                  <button
-                    key={fmt}
-                    type="button"
-                    onClick={() => {
-                      handleCurrentSubscriberDownload(fmt);
-                      setIsTemplateDropdownOpen(false);
-                    }}
-                    className="w-full text-left px-3 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 block transition-colors"
-                  >
-                    Export .{fmt.toUpperCase()} Format
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="flex flex-col gap-3 bg-white p-3 border border-slate-200 rounded-xl animate-in fade-in duration-200">
-        <div className="p-2 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-            <FileText className="h-4 w-4 text-indigo-500" />
-            <span className="truncate max-w-[200px]">{uploadedFile.name}</span>
-            <span className="text-[9px] font-mono bg-indigo-50 text-indigo-700 px-2 rounded border border-indigo-100">
-              {newFileReferenceId}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setUploadedFile(null);
-              setNewFileReferenceId(null);
-              setBulkErrors([]);
-            }}
-            className="p-1 text-slate-400 hover:text-red-500 rounded-lg transition-colors"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-bold">
-          <div className="bg-slate-50 rounded-lg p-2 border border-slate-100">
-            <span className="text-[9px] font-bold text-slate-400 block uppercase">
-              Staged Record Rows
-            </span>
-            <span className="text-sm font-black text-slate-700">
-              {bulkMetrics.total}
-            </span>
-          </div>
-          <div className="bg-green-50/40 rounded-lg p-2 border border-green-100">
-            <span className="text-[9px] font-bold text-green-500 block uppercase">
-              Validated Elements
-            </span>
-            <span className="text-sm font-black text-green-700 flex items-center justify-center gap-0.5">
-              <CheckCircle2 className="h-3 w-3 text-green-500" />{" "}
-              {bulkMetrics.valid}
-            </span>
-          </div>
-          <div className="bg-red-50/40 rounded-lg p-2 border border-red-100">
-            <span className="text-[9px] font-bold text-red-500 block uppercase">
-              Rejected Errors
-            </span>
-            <span className="text-sm font-black text-red-700 flex items-center justify-center gap-0.5">
-              <AlertCircle className="h-3 w-3 text-red-500" />{" "}
-              {bulkMetrics.invalid}
-            </span>
-          </div>
-        </div>
-
-        {bulkErrors.length > 0 && (
-          <div className="flex flex-col gap-1 animate-in slide-in-from-top-2 duration-200">
-            <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider block">
-              Ingesting Fault Diagnostics Logs
-            </span>
-            <div className="border border-red-100 rounded-lg overflow-hidden text-[11px] bg-white max-h-40 overflow-y-auto shadow-inner">
-              <table className="w-full border-collapse">
-                <thead className="sticky top-0 bg-red-50 z-10 text-red-700 font-bold text-left">
-                  <tr className="border-b border-red-100">
-                    <th className="p-2 w-16">Row ID</th>
-                    <th className="p-2 w-32">Identifier</th>
-                    <th className="p-2">
-                      Failure Reason Description Framework
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-red-50 text-slate-600 font-medium">
-                  {bulkErrors.map((err, idx) => (
-                    <tr
-                      key={`${err.row}-${idx}`}
-                      className="hover:bg-red-50/20 transition-colors"
-                    >
-                      <td className="p-2 font-bold font-mono text-red-600">
-                        Row {err.row}
-                      </td>
-                      <td className="p-2 font-mono text-slate-500 break-all">
-                        {err.identifier}
-                      </td>
-                      <td className="p-2 text-slate-500 leading-relaxed text-xs">
-                        {err.reason}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
 }

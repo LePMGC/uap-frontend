@@ -40,7 +40,8 @@ export interface ReimbursementItem {
   status: "pending" | "approved" | "success" | "rejected" | "failed";
   description?: string;
   rejection_reason?: string;
-  attachments: ReimbursementAttachment[];
+  attachments?: ReimbursementAttachment[];
+  input_file_records_count?: number;
   requested_by_user_id: string | number;
   reviewed_by_user_id?: string | number | null;
   reviewer_name?: string | null;

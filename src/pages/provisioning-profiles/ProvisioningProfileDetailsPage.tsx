@@ -1,320 +1,228 @@
-import { useState, useEffect, useMemo, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
-  Ticket,
-  Package,
-  Coins,
-  FileText,
-  CheckCircle2,
-  AlertCircle,
-  Clock,
-  XCircle,
-  Paperclip,
-  Trash2,
+  Layers,
+  Landmark,
+  Cpu,
+  ToggleLeft,
+  ToggleRight,
   Edit3,
   Save,
   X,
-  User,
-  ExternalLink,
-  ChevronDown,
-  Search,
-  Download,
-  UploadCloud,
-  FileDown,
-  Layers,
-  Phone,
-  ThumbsUp,
-  ThumbsDown,
-  Ban,
-  Activity,
-  Calendar,
+  Clock,
+  Loader2,
 } from "lucide-react";
-import {
-  reimbursementsService,
-  type ReimbursementItem,
-} from "@/services/reimbursementsService";
-import { useToastStore } from "@/hooks/useToastStore";
-import { useAuthStore } from "@/store/authStore";
-import { PERM } from "@/types/auth";
 import { cn } from "@/lib/utils";
-import { BundleDisplay } from "@/components/reimbursements/BundleDisplay";
+import { useToastStore } from "@/hooks/useToastStore";
+import { provisioningProfilesService } from "@/services/provisioningProfilesService";
+import { fundingAccountsService } from "@/services/fundingAccountsService";
+import { providerInstanceService } from "@/services/providerInstanceService";
+import { commandService } from "@/services/commandService";
+import { reimbursementsService } from "@/services/reimbursementsService";
 
-type TemplateFormat = "xlsx" | "csv" | "txt";
-
-interface ValidationErrorLog {
-  row: number;
-  identifier: string;
-  reason: string;
-}
-
-interface IngestionMetrics {
-  total: number;
-  valid: number;
-  invalid: number;
-}
-
-interface BackendBundleItem {
+interface FundingAccountLookup {
   id: number;
-  offer_id: number;
   name: string;
-  category: string;
-  price: string;
-  validity: number | null;
-  validity_units: string;
+  msisdn: string;
 }
 
-// Interface representing the new provisioning_execution structure
-interface ProvisioningExecutionDetails {
+interface ProviderInstanceLookup {
   id: number;
-  status: string;
-  execution_type: "COMMAND" | "BATCH";
-  started_at: string | null;
-  completed_at: string | null;
-  metrics: {
-    total_records: number;
-    success_count: number;
-    failure_count: number;
-    processed_count: number;
-  } | null;
-  errors: {
-    row: number | null;
-    identifier: string;
-    reason: string;
-  }[];
+  name: string;
+  category_slug?: string;
+  is_active?: boolean;
 }
 
-export default function ReimbursementDetailsPage() {
+interface CommandLookup {
+  id: number;
+  name: string;
+}
+
+export default function ProvisioningProfileDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { showToast } = useToastStore();
 
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const templateDropdownRef = useRef<HTMLDivElement>(null);
+  // Workspace States
+  const [isLoading, setIsLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingDropdowns, setIsLoadingDropdowns] = useState(false);
 
-  // Auth & Permissions
-  const currentUser = useAuthStore((state) => state.user);
-  const userPermissions = useMemo(
-    () => currentUser?.permissions || [],
-    [currentUser],
-  );
+  // Form State
+  const [name, setName] = useState("");
+  const [reimbursementType, setReimbursementType] = useState("BUNDLE");
+  const [bundleCategories, setBundleCategories] = useState<string[]>([]);
+  const [selectedBundleCategories, setSelectedBundleCategories] = useState<
+    string[]
+  >([]);
+  const [executionMode, setExecutionMode] = useState("COMMAND");
+  const [fundingAccountId, setFundingAccountId] = useState("");
+  const [provisioningProviderInstanceId, setProvisioningProviderInstanceId] =
+    useState("");
+  const [provisioningCommandId, setProvisioningCommandId] = useState("");
+  const [debitByProvisioningProvider, setDebitByProvisioningProvider] =
+    useState(true);
+  const [debitProviderInstanceId, setDebitProviderInstanceId] = useState("");
+  const [debitCommandId, setDebitCommandId] = useState("");
+  const [isActive, setIsActive] = useState(true);
 
-  const canModify =
-    userPermissions.includes(PERM.CREATE_SINGLE_REIMBURSEMENTS) ||
-    userPermissions.includes(PERM.CREATE_BULK_REIMBURSEMENTS);
-
-  const canApproveReject =
-    userPermissions.includes(PERM.APPROVE_TIER3_REIMBURSEMENTS) ||
-    userPermissions.includes(PERM.APPROVE_TIER2_REIMBURSEMENTS) ||
-    userPermissions.includes(PERM.APPROVE_TIER1_REIMBURSEMENTS);
-
-  // States Workspace
-  const [loading, setLoading] = useState<boolean>(true);
-  const [isEditing, setIsEditing] = useState<boolean>(false);
-  const [isActioning, setIsActioning] = useState<boolean>(false);
-  const [record, setRecord] = useState<any | null>(null); // Allowed flexible structure mapping for new properties
-
-  // Overlay Dialog States
-  const [isApproveModalOpen, setIsApproveModalOpen] = useState<boolean>(false);
-  const [isRejectModalOpen, setIsRejectModalOpen] = useState<boolean>(false);
-  const [isCancelModalOpen, setIsCancelModalOpen] = useState<boolean>(false);
-  const [rejectionReason, setRejectionReason] = useState<string>("");
-
-  // Form Parameters
-  const [ticketId, setTicketId] = useState<string>("");
-  const [description, setDescription] = useState<string>("");
-  const [reimbursementType, setReimbursementType] = useState<
-    "BUNDLE" | "AIRTIME"
-  >("BUNDLE");
-  const [reimbursementMode, setReimbursementMode] = useState<"AUTO" | "MANUAL">(
-    "AUTO",
-  );
-  const [isBulk, setIsBulk] = useState<boolean>(false);
-  const [msisdn, setMsisdn] = useState<string>("");
-  const [targetProductId, setTargetProductId] = useState<string>("");
-  const [bundle, setBundle] = useState<BackendBundleItem | null>(null);
-  const [amount, setAmount] = useState<string>("");
-  const [attachments, setAttachments] = useState<
-    { id: string; name: string }[]
+  // Lookups
+  const [fundingAccounts, setFundingAccounts] = useState<
+    FundingAccountLookup[]
+  >([]);
+  const [providerInstances, setProviderInstances] = useState<
+    ProviderInstanceLookup[]
   >([]);
 
-  // Live Catalog Back-End Sync Layers
-  const [categories, setCategories] = useState<string[]>([]);
-  const [bundles, setBundles] = useState<BackendBundleItem[]>([]);
-  const [isLoadingCatalog, setIsLoadingCatalog] = useState(false);
+  // Categorized Commands lists
+  const [provisioningCommands, setProvisioningCommands] = useState<
+    CommandLookup[]
+  >([]);
+  const [debitCommands, setDebitCommands] = useState<CommandLookup[]>([]);
 
-  // Bulk Staging Overwrites
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [isProcessingFile, setIsProcessingFile] = useState<boolean>(false);
-  const [currentFileReferenceId, setCurrentFileReferenceId] = useState<
-    string | null
-  >(null);
-  const [newFileReferenceId, setNewFileReferenceId] = useState<string | null>(
-    null,
-  );
+  // Category Command Loading States
+  const [loadingProvisioningCommands, setLoadingProvisioningCommands] =
+    useState(false);
+  const [loadingDebitCommands, setLoadingDebitCommands] = useState(false);
 
-  const [bulkMetrics, setBulkMetrics] = useState<IngestionMetrics>({
-    total: 0,
-    valid: 0,
-    invalid: 0,
-  });
-  const [bulkErrors, setBulkErrors] = useState<ValidationErrorLog[]>([]);
-
-  const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] =
-    useState<boolean>(false);
-  const [isDownloading, setIsDownloading] = useState<boolean>(false);
-  const [isDownloadingInput, setIsDownloadingInput] = useState<boolean>(false);
-
-  // Dropdown Category Selectors
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [searchQuery, setSearchQuery] = useState<string>("");
-  const [isOpenDropdown, setIsOpenDropdown] = useState<boolean>(false);
-
-  const [isUploading, setIsUploading] = useState<boolean>(false);
-  const [isSaving, setIsSaving] = useState<boolean>(false);
-
+  // 1. Load Initial Dependencies (Funding accounts, Provider instances, Categories)
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
-        setIsOpenDropdown(false);
-      }
-      if (
-        templateDropdownRef.current &&
-        !templateDropdownRef.current.contains(event.target as Node)
-      ) {
-        setIsTemplateDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // Fetch Live Bundle Catalog Data from the Back-End
-  useEffect(() => {
-    async function loadCatalog() {
+    async function loadDependencies() {
       try {
-        setIsLoadingCatalog(true);
-        const response = await reimbursementsService.getBundles();
+        setIsLoadingDropdowns(true);
+        const [fundingRes, providersRes, categoriesRes] = await Promise.all([
+          fundingAccountsService.getAccounts(1, 1000),
+          providerInstanceService.getAll(1, 1000),
+          reimbursementsService.getBundleCategories(),
+        ]);
 
-        if (!response.success) {
-          throw new Error("Unable to load catalog");
-        }
-
-        const backendBundles: BackendBundleItem[] = response.data.bundles ?? [];
-        setBundles(backendBundles);
-
-        const officialCategories = response.data.categories ?? [];
-        setCategories(officialCategories);
-
-        if (officialCategories.length > 0 && !selectedCategory) {
-          setSelectedCategory(officialCategories[0]);
-        }
+        setBundleCategories(categoriesRes?.data ?? []);
+        setFundingAccounts(fundingRes?.data?.data ?? fundingRes?.data ?? []);
+        setProviderInstances(
+          providersRes?.data?.data ?? providersRes?.data ?? [],
+        );
       } catch (err) {
-        console.error(err);
-        showToast("Unable to load reimbursement catalog.", "error");
+        showToast("Failed to load engine infrastructure relations.", "error");
       } finally {
-        setIsLoadingCatalog(false);
+        setIsLoadingDropdowns(false);
       }
     }
-
-    loadCatalog();
+    loadDependencies();
   }, [showToast]);
 
-  const filteredBundles = useMemo(() => {
-    return bundles.filter(
-      (b) =>
-        b.category === selectedCategory &&
-        (b.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          String(b.id).includes(searchQuery) ||
-          String(b.offer_id).includes(searchQuery)),
-    );
-  }, [bundles, selectedCategory, searchQuery]);
-
-  const selectedBundleName = useMemo(() => {
-    const found = bundles.find((b) => String(b.id) === String(targetProductId));
-    if (!found) {
-      return "Choose explicit product schema...";
-    }
-
-    return (
-      <span className="flex items-center gap-3 text-xs">
-        <span className="font-bold text-slate-800">{found.name}</span>
-        <span className="text-slate-400">|</span>
-        <span className="font-mono text-slate-600">#{found.offer_id}</span>
-        <span className="text-slate-400">|</span>
-        <span className="font-semibold text-indigo-600">{found.price}</span>
-      </span>
-    );
-  }, [bundles, targetProductId]);
-
-  // Handle setting category once details match live catalog definitions
+  // 2. Fetch Provisioning Commands when Provisioning Provider Instance changes
   useEffect(() => {
-    if (record?.target_product_id && bundles.length > 0) {
-      const matchingBundle = bundles.find(
-        (b) => String(b.id) === String(record.target_product_id),
-      );
-      if (matchingBundle) {
-        setSelectedCategory(matchingBundle.category);
-      }
+    if (!provisioningProviderInstanceId) {
+      setProvisioningCommands([]);
+      return;
     }
-  }, [record?.target_product_id, bundles]);
 
+    const fetchProvisioningCommands = async () => {
+      setLoadingProvisioningCommands(true);
+      try {
+        const instance = providerInstances.find(
+          (i) => i.id.toString() === provisioningProviderInstanceId.toString(),
+        );
+        if (instance?.category_slug) {
+          const res = await commandService.getCommandsByCategory(
+            instance.category_slug,
+            true,
+          );
+          setProvisioningCommands(res?.data?.data ?? res?.data ?? res ?? []);
+        } else {
+          setProvisioningCommands([]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch provisioning commands:", err);
+        setProvisioningCommands([]);
+      } finally {
+        setLoadingProvisioningCommands(false);
+      }
+    };
+
+    fetchProvisioningCommands();
+  }, [provisioningProviderInstanceId, providerInstances]);
+
+  // 3. Fetch Debit Commands when Debit Provider Instance changes
+  useEffect(() => {
+    if (debitByProvisioningProvider || !debitProviderInstanceId) {
+      setDebitCommands([]);
+      return;
+    }
+
+    const fetchDebitCommands = async () => {
+      setLoadingDebitCommands(true);
+      try {
+        const instance = providerInstances.find(
+          (i) => i.id.toString() === debitProviderInstanceId.toString(),
+        );
+        if (instance?.category_slug) {
+          const res = await commandService.getCommandsByCategory(
+            instance.category_slug,
+            true,
+          );
+          setDebitCommands(res?.data?.data ?? res?.data ?? res ?? []);
+        } else {
+          setDebitCommands([]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch debit commands:", err);
+        setDebitCommands([]);
+      } finally {
+        setLoadingDebitCommands(false);
+      }
+    };
+
+    fetchDebitCommands();
+  }, [debitProviderInstanceId, debitByProvisioningProvider, providerInstances]);
+
+  // 4. Load Profile Details
   const fetchDetails = async () => {
     if (!id) return;
     try {
-      setLoading(true);
-      const response = await reimbursementsService.getReimbursementDetails(id);
+      setIsLoading(true);
+      const response = await provisioningProfilesService.getProfileById(id);
       const data = (response as any).data || response;
 
-      if (!data)
-        throw new Error(
-          "Missing structural item block wrapper data exceptions.",
-        );
+      if (!data) throw new Error("Missing profile data.");
 
-      setRecord(data);
-      setTicketId(data.ticket_id);
-      setDescription(data.description || "");
-      setReimbursementType(data.reimbursement_type);
-      setReimbursementMode(data.reimbursement_mode);
-      setIsBulk(!!data.is_bulk);
-      setMsisdn((data as any).msisdn || "");
-      setTargetProductId(
-        data.target_product_id ? String(data.target_product_id) : "",
+      setName(data.name || "");
+      setReimbursementType(data.reimbursement_type || "BUNDLE");
+      setSelectedBundleCategories(data.catalog_product_types || []);
+      setExecutionMode(data.execution_mode || "COMMAND");
+      setFundingAccountId(
+        data.funding_account_id ? String(data.funding_account_id) : "",
       );
-      setBundle(data.bundle || null);
-      setAmount(
-        data.amount !== null && data.amount !== undefined
-          ? String(data.amount)
+      setProvisioningProviderInstanceId(
+        data.provisioning_provider_instance_id
+          ? String(data.provisioning_provider_instance_id)
           : "",
       );
-
-      setCurrentFileReferenceId(data.file_reference_id || null);
-      setUploadedFile(null);
-      setNewFileReferenceId(null);
-      setBulkErrors([]);
-
-      if (data.attachments) {
-        setAttachments(
-          data.attachments.map((att: any) => ({
-            id: String(att.id),
-            name: att.file_name,
-          })),
-        );
-      }
-      if (data.bulk_metrics) {
-        setBulkMetrics(data.bulk_metrics);
-      } else {
-        setBulkMetrics({ total: 0, valid: 0, invalid: 0 });
-      }
+      setProvisioningCommandId(
+        data.provisioning_command_id
+          ? String(data.provisioning_command_id)
+          : "",
+      );
+      setDebitByProvisioningProvider(
+        data.debit_using_provisioning_provider ?? true,
+      );
+      setDebitProviderInstanceId(
+        data.debit_provider_instance_id
+          ? String(data.debit_provider_instance_id)
+          : "",
+      );
+      setDebitCommandId(
+        data.debit_command_id ? String(data.debit_command_id) : "",
+      );
+      setIsActive(data.is_active ?? true);
     } catch (err) {
       console.error(err);
-      showToast("Failed to retrieve structural details.", "error");
-      navigate("/reimbursements");
+      showToast("Failed to retrieve profile details.", "error");
+      navigate("/provisioning-profiles");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -322,1487 +230,489 @@ export default function ReimbursementDetailsPage() {
     fetchDetails();
   }, [id]);
 
-  // --- WORKFLOW TRANSACTIONS INTERFACES ---
-  const handleApproveSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    if (debitByProvisioningProvider) {
+      setDebitProviderInstanceId("");
+      setDebitCommandId("");
+    }
+  }, [debitByProvisioningProvider]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return;
 
-    try {
-      setIsActioning(true);
-      await reimbursementsService.approveReimbursement(id);
-      showToast("Reimbursement transaction approved successfully.", "success");
-      setIsApproveModalOpen(false);
-      await fetchDetails();
-    } catch (error) {
-      showToast(
-        "An error occurred during approval configuration layout updates.",
-        "error",
-      );
-    } finally {
-      setIsActioning(false);
-    }
-  };
-
-  const handleRejectSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!id || !rejectionReason.trim()) return;
-
-    try {
-      setIsActioning(true);
-      await reimbursementsService.rejectReimbursement(
-        id,
-        rejectionReason.trim(),
-      );
-      showToast("Reimbursement marked as rejected.", "success");
-      setIsRejectModalOpen(false);
-      setRejectionReason("");
-      await fetchDetails();
-    } catch (error) {
-      showToast("Failed to update rejection metrics logs.", "error");
-    } finally {
-      setIsActioning(false);
-    }
-  };
-
-  const handleCancelSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!id) return;
-
-    try {
-      setIsActioning(true);
-      await reimbursementsService.cancelReimbursement(id);
-      showToast("Reimbursement request has been cancelled.", "success");
-      setIsCancelModalOpen(false);
-      await fetchDetails();
-    } catch (error) {
-      showToast("Failed to cancel pending request ledger entry.", "error");
-    } finally {
-      setIsActioning(false);
-    }
-  };
-
-  const handleSecureInputDownload = async () => {
-    if (!id) return;
-    try {
-      setIsDownloadingInput(true);
-      await reimbursementsService.downloadInputFile(id);
-      showToast("Input spreadsheet downloaded successfully.", "success");
-    } catch (error) {
-      showToast(
-        "Session file fetch unauthorized or missing on storage layers.",
-        "error",
-      );
-    } finally {
-      setIsDownloadingInput(false);
-    }
-  };
-
-  const handleCurrentSubscriberDownload = async (format: TemplateFormat) => {
-    if (!id) return;
-    try {
-      setIsDownloading(true);
-      await reimbursementsService.downloadCurrentSubscribers(id, format);
-      showToast(
-        "Current subscriber template exported successfully.",
-        "success",
-      );
-    } catch (error) {
-      showToast(
-        "Failed to generate download template format data stream.",
-        "error",
-      );
-    } finally {
-      setIsDownloading(false);
-    }
-  };
-
-  const handleFileIngestion = async (file: File) => {
-    if (!record) return;
-    setIsProcessingFile(true);
-    setBulkErrors([]);
-
-    try {
-      const distributionMode = targetProductId ? "MANY_SINGLE" : "MANY_MANY";
-      const response = await reimbursementsService.validateInboundSheet(
-        file,
-        distributionMode,
-      );
-
-      if (response.success) {
-        setUploadedFile(file);
-        setNewFileReferenceId(response.file_reference_id);
-        setBulkMetrics(response.metrics);
-        setBulkErrors(response.errors || []);
-
-        if (response.metrics.invalid > 0) {
-          showToast(
-            `Replacement data contains ${response.metrics.invalid} schema violations.`,
-            "error",
-          );
-        } else {
-          showToast("Replacement list staged cleanly.", "success");
-        }
-      } else {
-        throw new Error(
-          response.message || "File validation formatting breakdown.",
-        );
-      }
-    } catch (err: any) {
-      setUploadedFile(null);
-      setNewFileReferenceId(null);
-      showToast(
-        err?.message || "Failed to process target matrix replacement.",
-        "error",
-      );
-    } finally {
-      setIsProcessingFile(false);
-    }
-  };
-
-  const handleAttachmentUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    setIsUploading(true);
-
-    try {
-      const newItems: { id: string; name: string }[] = [];
-      for (const file of Array.from(files)) {
-        const response =
-          await reimbursementsService.uploadEvidenceAttachment(file);
-        const serverPayload = (response as any).data || response;
-        if (serverPayload && serverPayload.id) {
-          newItems.push({
-            id: String(serverPayload.id),
-            name: serverPayload.file_name,
-          });
-        }
-      }
-      setAttachments((prev) => [...prev, ...newItems]);
-      showToast("Support vouchers uploaded successfully.", "success");
-    } catch (err) {
-      showToast("Failed to upload evidence records.", "error");
-    } finally {
-      setIsUploading(false);
-      e.target.value = "";
-    }
-  };
-
-  const removeAttachment = (targetId: string) => {
-    setAttachments((prev) => prev.filter((a) => a.id !== targetId));
-  };
-
-  const handleSaveChanges = async () => {
-    if (!id || !record) return;
-    if (!ticketId.trim())
-      return showToast("Trouble Ticket reference cannot be empty.", "error");
-    if (!isBulk && !msisdn.trim())
+    if (
+      !name.trim() ||
+      !reimbursementType.trim() ||
+      !fundingAccountId ||
+      !provisioningProviderInstanceId ||
+      !provisioningCommandId
+    ) {
       return showToast(
-        "MSISDN parameter is required for single transactions.",
+        "Please complete all required provisioning parameters.",
         "error",
       );
-    if (isBulk && bulkErrors.length > 0)
-      return showToast(
-        "Clear validation errors before tracking update rules.",
-        "error",
-      );
-    if (isBulk && !newFileReferenceId && !currentFileReferenceId) {
-      return showToast(
-        "A subscriber distribution file is required for bulk mode.",
-        "error",
-      );
+    }
+
+    if (!debitByProvisioningProvider) {
+      if (!debitProviderInstanceId)
+        return showToast("Please select the debit provider instance.", "error");
+      if (!debitCommandId)
+        return showToast("Please select the debit command.", "error");
     }
 
     const payload = {
-      ticket_id: ticketId,
-      description: description,
+      name: name.trim(),
       reimbursement_type: reimbursementType,
-      reimbursement_mode: reimbursementMode,
-      is_bulk: isBulk,
-      msisdn: !isBulk ? msisdn.trim() : undefined,
-      target_product_id:
-        reimbursementType === "BUNDLE" ? targetProductId : undefined,
-      amount: reimbursementType === "AIRTIME" ? Number(amount) : undefined,
-      attachment_ids: attachments.map((a) => a.id),
-      file_reference_id: isBulk
-        ? newFileReferenceId || currentFileReferenceId || undefined
-        : undefined,
+      catalog_product_types:
+        reimbursementType === "BUNDLE" ? selectedBundleCategories : [],
+      execution_mode: executionMode,
+      funding_account_id: Number(fundingAccountId),
+      provisioning_provider_instance_id: Number(provisioningProviderInstanceId),
+      provisioning_command_id: provisioningCommandId
+        ? Number(provisioningCommandId)
+        : null,
+      debit_using_provisioning_provider: debitByProvisioningProvider,
+      debit_provider_instance_id: debitByProvisioningProvider
+        ? null
+        : debitProviderInstanceId
+          ? Number(debitProviderInstanceId)
+          : null,
+      debit_command_id: debitByProvisioningProvider
+        ? null
+        : debitCommandId
+          ? Number(debitCommandId)
+          : null,
+      is_active: isActive,
     };
 
+    setIsSubmitting(true);
     try {
-      setIsSaving(true);
-      await reimbursementsService.updateReimbursement(id, payload);
-      showToast("Reimbursement transaction updated successfully.", "success");
+      await provisioningProfilesService.updateProfile(id, payload);
+      showToast("Provisioning profile updated successfully.", "success");
       setIsEditing(false);
       await fetchDetails();
     } catch (err) {
-      showToast("Failed to commit ledger synchronization updates.", "error");
+      showToast(
+        "Failed to compile and write provisioning profile updates.",
+        "error",
+      );
     } finally {
-      setIsSaving(false);
+      setIsSubmitting(false);
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const config: Record<
-      string,
-      { bg: string; text: string; icon: any; label: string }
-    > = {
-      pending: {
-        bg: "bg-amber-50 border-amber-200",
-        text: "text-amber-700",
-        icon: Clock,
-        label: "Pending Approval",
-      },
-      approved: {
-        bg: "bg-blue-50 border-blue-200",
-        text: "text-blue-700",
-        icon: CheckCircle2,
-        label: "Approved",
-      },
-      pending_provisioning: {
-        bg: "bg-indigo-50 border-indigo-200",
-        text: "text-indigo-700",
-        icon: Clock,
-        label: "Pending Provisioning",
-      },
-      provisioning_ongoing: {
-        bg: "bg-sky-50 border-sky-200",
-        text: "text-sky-700",
-        icon: Activity,
-        label: "Provisioning Ongoing",
-      },
-      fully_provisioned: {
-        bg: "bg-emerald-50 border-emerald-200",
-        text: "text-emerald-700",
-        icon: CheckCircle2,
-        label: "Fully Provisioned",
-      },
-      provisioning_failed: {
-        bg: "bg-rose-50 border-rose-200",
-        text: "text-rose-700",
-        icon: AlertCircle,
-        label: "Provisioning Failed",
-      },
-      success: {
-        bg: "bg-emerald-50 border-emerald-200",
-        text: "text-emerald-700",
-        icon: CheckCircle2,
-        label: "Success",
-      },
-      rejected: {
-        bg: "bg-rose-50 border-rose-200",
-        text: "text-rose-700",
-        icon: XCircle,
-        label: "Rejected",
-      },
-      failed: {
-        bg: "bg-red-50 border-red-200",
-        text: "text-red-700",
-        icon: AlertCircle,
-        label: "Execution Failed",
-      },
-    };
-    const c = config[status] || config.pending;
-    const Icon = c.icon;
-    return (
-      <div
-        className={cn(
-          "px-3 py-1.5 border rounded-full flex items-center gap-1.5 text-xs font-bold w-fit shadow-sm whitespace-nowrap",
-          c.bg,
-          c.text,
-        )}
-      >
-        <Icon className="h-3.5 w-3.5 shrink-0" />
-        {c.label}
-      </div>
-    );
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="p-8 flex flex-col items-center justify-center min-h-[400px] text-slate-400 text-xs font-semibold gap-2 font-mono animate-pulse">
         <Clock className="h-6 w-6 text-indigo-500 animate-spin" />
-        LOADING WORKSPACE ENTRY REGISTRIES...
+        LOADING PROFILE REGISTRIES...
       </div>
     );
   }
 
-  if (!record) return null;
-
   return (
-    <div className="p-8 max-w-[1600px] mx-auto space-y-6 animate-in fade-in duration-500 relative">
-      {/* Header Strip */}
+    <div className="p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate("/reimbursements")}
-            className="h-9 w-9 border border-slate-200 rounded-xl flex items-center justify-center hover:bg-slate-50 text-slate-600 transition-all shadow-sm"
+            onClick={() => navigate("/provisioning-profiles")}
+            type="button"
+            className="p-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-all shadow-sm text-slate-500 active:scale-95"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div>
-            <div className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">
-              Reimbursement Details
-            </div>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900">
+              Provisioning Profile Details
+            </h1>
+            <span className="text-xs font-mono text-slate-400">ID: {id}</span>
           </div>
         </div>
 
-        {/* Workflow State Validation Matrix Actions Menu Controls */}
-        <div className="flex flex-wrap items-center gap-2">
-          {record.status === "pending" && (
+        <div className="flex items-center gap-2">
+          {isEditing ? (
             <>
-              {canApproveReject &&
-                record.capabilities?.can_approve === true && (
-                  <div className="flex items-center gap-2 border-r pr-2 mr-1 border-slate-200">
-                    <button
-                      type="button"
-                      disabled={isActioning}
-                      onClick={() => setIsRejectModalOpen(true)}
-                      className="h-9 px-3.5 rounded-xl border border-rose-200 bg-rose-50/50 text-rose-700 font-bold text-xs hover:bg-rose-100/60 flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
-                    >
-                      <ThumbsDown className="h-3.5 w-3.5" /> Reject
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isActioning}
-                      onClick={() => setIsApproveModalOpen(true)}
-                      className="h-9 px-4 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
-                    >
-                      <ThumbsUp className="h-3.5 w-3.5" /> Approve
-                    </button>
-                  </div>
-                )}
-
-              {record.capabilities?.can_cancel === true && (
-                <button
-                  type="button"
-                  disabled={isActioning}
-                  onClick={() => setIsCancelModalOpen(true)}
-                  className="h-9 px-3.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
-                >
-                  <Ban className="h-3.5 w-3.5 text-slate-400" /> Cancel
-                </button>
-              )}
-            </>
-          )}
-
-          {record.status === "pending" && canModify && (
-            <div className="flex items-center gap-2">
-              {isEditing ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsEditing(false);
-                      fetchDetails();
-                    }}
-                    disabled={isSaving}
-                    className="h-9 px-4 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 flex items-center gap-1.5 shadow-sm"
-                  >
-                    <X className="h-3.5 w-3.5" /> Discard
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveChanges}
-                    disabled={
-                      isSaving || isUploading || (isBulk && isProcessingFile)
-                    }
-                    className="h-9 px-4 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 flex items-center gap-1.5 shadow-sm transition-colors disabled:opacity-50"
-                  >
-                    <Save className="h-3.5 w-3.5" />{" "}
-                    {isSaving ? "Saving..." : "Save Changes"}
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setIsEditing(true)}
-                  className="h-9 px-4 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 flex items-center gap-1.5 shadow-sm transition-colors"
-                >
-                  <Edit3 className="h-3.5 w-3.5" /> Edit Request Form
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        <div className="lg:col-span-8 flex flex-col gap-6">
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm flex flex-col gap-4">
-            <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest border-b border-slate-50 pb-2">
-              Primary Parameter Details
-            </h2>
-
-            {/* Injected Active Rejection Note Container */}
-            {record.status === "rejected" && record.rejection_reason && (
-              <div className="p-4 bg-rose-50 border border-rose-100 text-rose-800 rounded-xl space-y-1 text-xs">
-                <span className="font-bold text-[10px] text-rose-500 uppercase tracking-wide block">
-                  Rejection Audit Parameter Description Note
-                </span>
-                <p className="font-mono bg-white p-2.5 border border-rose-200/60 rounded-lg font-medium leading-relaxed shadow-inner text-slate-700">
-                  {record.rejection_reason}
-                </p>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-medium text-slate-600">
-              <div className="flex flex-col gap-1 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                  <Ticket className="h-3 w-3 text-indigo-500" /> Trouble Ticket
-                  ID Reference
-                </span>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={ticketId}
-                    onChange={(e) => setTicketId(e.target.value)}
-                    className="mt-1 w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-bold font-mono outline-none focus:border-indigo-500 transition-colors"
-                  />
-                ) : (
-                  <span className="font-mono text-slate-900 font-bold text-sm mt-0.5">
-                    {ticketId}
-                  </span>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-1 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                  <Package className="h-3 w-3 text-indigo-500" /> Reimbursement
-                  Mode Type
-                </span>
-                {isEditing ? (
-                  <div className="grid grid-cols-2 bg-slate-100 rounded-lg p-0.5 mt-1">
-                    <button
-                      type="button"
-                      onClick={() => setReimbursementMode("AUTO")}
-                      className={cn(
-                        "py-1 text-[11px] font-bold rounded-md transition-all",
-                        reimbursementMode === "AUTO"
-                          ? "bg-white text-indigo-600 shadow-sm"
-                          : "text-slate-500 hover:text-slate-700",
-                      )}
-                    >
-                      AUTO
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setReimbursementMode("MANUAL")}
-                      className={cn(
-                        "py-1 text-[11px] font-bold rounded-md transition-all",
-                        reimbursementMode === "MANUAL"
-                          ? "bg-white text-indigo-600 shadow-sm"
-                          : "text-slate-500 hover:text-slate-700",
-                      )}
-                    >
-                      MANUAL
-                    </button>
-                  </div>
-                ) : (
-                  <span className="font-bold text-slate-900 mt-1 flex items-center gap-1.5">
-                    <span
-                      className={cn(
-                        "h-2 w-2 rounded-full",
-                        record.reimbursement_mode === "AUTO"
-                          ? "bg-purple-500"
-                          : "bg-blue-500",
-                      )}
-                    />
-                    {record.reimbursement_mode} DISPATCH
-                  </span>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-1 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                  <Coins className="h-3 w-3 text-indigo-500" /> Distribution
-                  Strategy Scope
-                </span>
-                {isEditing ? (
-                  <div className="grid grid-cols-2 bg-slate-100 rounded-lg p-0.5 mt-1">
-                    <button
-                      type="button"
-                      onClick={() => setIsBulk(false)}
-                      className={cn(
-                        "py-1 text-[11px] font-bold rounded-md transition-all",
-                        !isBulk
-                          ? "bg-white text-indigo-600 shadow-sm"
-                          : "text-slate-500 hover:text-slate-700",
-                      )}
-                    >
-                      SINGLE TRANSACTION
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsBulk(true)}
-                      className={cn(
-                        "py-1 text-[11px] font-bold rounded-md transition-all",
-                        isBulk
-                          ? "bg-white text-indigo-600 shadow-sm"
-                          : "text-slate-500 hover:text-slate-700",
-                      )}
-                    >
-                      BULK MATRIX
-                    </button>
-                  </div>
-                ) : (
-                  <span className="font-bold text-slate-900 mt-1">
-                    {isBulk
-                      ? "BULK MATRIX PROCESSING FILE"
-                      : "SINGLE TRANSACTION TARGET"}
-                  </span>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-1 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                  <Package className="h-3 w-3 text-indigo-500" /> Reimbursement
-                  Allocation Type
-                </span>
-                {isEditing ? (
-                  <div className="grid grid-cols-2 bg-slate-100 rounded-lg p-0.5 mt-1">
-                    <button
-                      type="button"
-                      onClick={() => setReimbursementType("BUNDLE")}
-                      className={cn(
-                        "py-1 text-[11px] font-bold rounded-md transition-all",
-                        reimbursementType === "BUNDLE"
-                          ? "bg-white text-indigo-600 shadow-sm"
-                          : "text-slate-500 hover:text-slate-700",
-                      )}
-                    >
-                      BUNDLE
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setReimbursementType("AIRTIME")}
-                      className={cn(
-                        "py-1 text-[11px] font-bold rounded-md transition-all",
-                        reimbursementType === "AIRTIME"
-                          ? "bg-white text-indigo-600 shadow-sm"
-                          : "text-slate-500 hover:text-slate-700",
-                      )}
-                    >
-                      AIRTIME
-                    </button>
-                  </div>
-                ) : (
-                  <span className="font-bold text-slate-900 mt-1 uppercase">
-                    {reimbursementType} ALLOCATION
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Target Subscriber MSISDN Input */}
-            {!isBulk && (
-              <div className="flex flex-col gap-1 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs animate-in fade-in duration-200">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                  <Phone className="h-3 w-3 text-indigo-500" /> Target
-                  Subscriber Number (MSISDN)
-                </span>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    placeholder="e.g. 233XXXXXXXXX"
-                    value={msisdn}
-                    onChange={(e) => setMsisdn(e.target.value)}
-                    className="mt-1.5 w-full max-w-xs px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-bold font-mono outline-none focus:border-indigo-500 transition-colors"
-                  />
-                ) : (
-                  <span className="font-mono text-slate-900 font-bold text-sm mt-0.5">
-                    {msisdn || "No targeted subscriber assigned"}
-                  </span>
-                )}
-              </div>
-            )}
-
-            {/* Target Allocations Configuration Options */}
-            <div className="flex flex-col gap-1 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs">
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                <Package className="h-3 w-3 text-indigo-500" /> Bundle / Airtime
-                Value
-              </span>
-
-              {isEditing ? (
-                reimbursementType === "BUNDLE" ? (
-                  <div className="flex flex-col gap-3 mt-1.5">
-                    <div className="flex overflow-x-auto flex-nowrap gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 scrollbar-thin scrollbar-thumb-slate-300">
-                      {categories.map((cat) => (
-                        <button
-                          key={cat}
-                          type="button"
-                          onClick={() => {
-                            setSelectedCategory(cat);
-                            setTargetProductId("");
-                          }}
-                          className={cn(
-                            "shrink-0 whitespace-nowrap py-1.5 px-3 text-[10px] font-bold rounded-lg transition-all text-center border-0",
-                            selectedCategory === cat
-                              ? "bg-white text-indigo-600 shadow-sm"
-                              : "text-slate-500 hover:text-slate-800",
-                          )}
-                        >
-                          {cat.replace("_", " ")}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="relative" ref={dropdownRef}>
-                      <button
-                        type="button"
-                        onClick={() => setIsOpenDropdown(!isOpenDropdown)}
-                        className="w-full h-9 px-3 bg-white border border-slate-200 rounded-lg flex items-center justify-between text-slate-800 font-bold text-left shadow-sm"
-                      >
-                        <span className="truncate">{selectedBundleName}</span>
-                        <ChevronDown
-                          className={cn(
-                            "h-4 w-4 text-slate-400 transition-transform duration-200",
-                            isOpenDropdown && "transform rotate-180",
-                          )}
-                        />
-                      </button>
-
-                      {isOpenDropdown && (
-                        <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-2 flex flex-col gap-2 max-h-60 overflow-y-auto">
-                          <div className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
-                            <Search className="h-3.5 w-3.5 text-slate-400" />
-                            <input
-                              type="text"
-                              placeholder="Search current category list items..."
-                              value={searchQuery}
-                              onChange={(e) => setSearchQuery(e.target.value)}
-                              className="w-full bg-transparent text-[11px] font-medium outline-none text-slate-700"
-                            />
-                          </div>
-                          <div className="flex flex-col gap-0.5">
-                            {filteredBundles.length === 0 ? (
-                              <div className="text-center p-3 text-slate-400 text-[10px] font-mono">
-                                No matching bundles found...
-                              </div>
-                            ) : (
-                              filteredBundles.map((pkg) => (
-                                <button
-                                  key={pkg.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setTargetProductId(String(pkg.id));
-                                    setIsOpenDropdown(false);
-                                    setSearchQuery("");
-                                  }}
-                                  className={cn(
-                                    "w-full text-left px-3 py-2 rounded-lg cursor-pointer transition-colors flex flex-col gap-0.5 border-0",
-                                    String(targetProductId) === String(pkg.id)
-                                      ? "bg-indigo-50"
-                                      : "hover:bg-slate-50 bg-transparent",
-                                  )}
-                                >
-                                  <div className="font-bold text-[11px] text-slate-800">
-                                    {pkg.name}
-                                  </div>
-                                  <div className="flex items-center justify-between w-full mt-1">
-                                    <span className="font-mono text-[10px] text-slate-500">
-                                      Offer ID: {pkg.offer_id}
-                                    </span>
-                                    <span className="font-mono text-[10px] bg-slate-200/60 px-1.5 py-0.5 rounded text-slate-600">
-                                      {pkg.price}
-                                    </span>
-                                  </div>
-                                </button>
-                              ))
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="relative mt-1.5 max-w-xs">
-                    <span className="absolute left-3 top-2.5 text-slate-400 font-bold font-mono text-[11px]">
-                      CFA
-                    </span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      className="w-full pl-11 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-bold font-mono outline-none focus:border-indigo-500"
-                    />
-                  </div>
-                )
-              ) : (
-                <span className="font-bold text-slate-900 mt-0.5 font-mono text-xs">
-                  {reimbursementType === "BUNDLE" ? (
-                    bundle ? (
-                      <BundleDisplay
-                        name={bundle?.name}
-                        offerId={bundle?.offer_id}
-                        price={bundle?.price}
-                      />
-                    ) : (
-                      "None chosen"
-                    )
-                  ) : (
-                    `AIRTIME AMOUNT: ${amount} `
-                  )}
-                </span>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-1.5 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs">
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                <FileText className="h-3 w-3 text-indigo-500" /> Reimbursement
-                Description
-              </span>
-              {isEditing ? (
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={2}
-                  className="mt-1 w-full p-2.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-medium outline-none resize-none"
-                />
-              ) : (
-                <p className="text-slate-700 font-medium leading-relaxed mt-0.5">
-                  {description || "No notes provided."}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* New Provisioning Execution Report Section */}
-          {record.provisioning_execution && (
-            <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm flex flex-col gap-4 animate-in fade-in duration-300">
-              <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-                <div className="flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-indigo-600" />
-                  <h2 className="text-xs font-black uppercase text-slate-800 tracking-wider">
-                    Provisioning Execution Report
-                  </h2>
-                </div>
-                <span
-                  className={cn(
-                    "px-2.5 py-1 rounded-md text-[10px] font-black uppercase font-mono tracking-wider",
-                    record.provisioning_execution.status === "COMPLETED" ||
-                      record.provisioning_execution.status === "SUCCESS"
-                      ? "bg-emerald-100 text-emerald-800"
-                      : record.provisioning_execution.status === "RUNNING" ||
-                          record.provisioning_execution.status === "PENDING"
-                        ? "bg-sky-100 text-sky-800"
-                        : "bg-rose-100 text-rose-800",
-                  )}
-                >
-                  Engine State: {record.provisioning_execution.status}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-medium text-slate-600">
-                <div className="flex flex-col gap-1 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                    <Layers className="h-3.5 w-3.5 text-slate-400" /> Execution
-                    Reference
-                  </span>
-                  <span className="font-mono text-slate-900 font-bold mt-0.5">
-                    #{record.provisioning_execution.id} (
-                    {record.provisioning_execution.execution_type})
-                  </span>
-                </div>
-
-                <div className="flex flex-col gap-1 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                    <Calendar className="h-3.5 w-3.5 text-slate-400" />{" "}
-                    Operational Timing Window
-                  </span>
-                  <div className="text-[10px] font-semibold text-slate-700 mt-1 space-y-0.5">
-                    <div>
-                      Started:{" "}
-                      <span className="font-mono text-slate-900">
-                        {record.provisioning_execution.started_at
-                          ? new Date(
-                              record.provisioning_execution.started_at,
-                            ).toLocaleString()
-                          : "N/A"}
-                      </span>
-                    </div>
-                    {record.provisioning_execution.completed_at && (
-                      <div>
-                        Completed:{" "}
-                        <span className="font-mono text-slate-900">
-                          {new Date(
-                            record.provisioning_execution.completed_at,
-                          ).toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Metrics block */}
-              {record.provisioning_execution.metrics && (
-                <div className="grid grid-cols-4 gap-2 text-center text-[10px] font-black uppercase tracking-wider">
-                  <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100">
-                    <span className="text-slate-400 block mb-0.5">
-                      Total Row Count
-                    </span>
-                    <span className="text-sm text-slate-800 font-mono">
-                      {record.provisioning_execution.metrics.total_records}
-                    </span>
-                  </div>
-                  <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100">
-                    <span className="text-slate-400 block mb-0.5">
-                      Processed
-                    </span>
-                    <span className="text-sm text-slate-800 font-mono">
-                      {record.provisioning_execution.metrics.processed_count}
-                    </span>
-                  </div>
-                  <div className="bg-emerald-50/60 rounded-xl p-2.5 border border-emerald-100">
-                    <span className="text-emerald-600 block mb-0.5">
-                      Success
-                    </span>
-                    <span className="text-sm text-emerald-700 font-mono">
-                      {record.provisioning_execution.metrics.success_count}
-                    </span>
-                  </div>
-                  <div className="bg-rose-50/60 rounded-xl p-2.5 border border-rose-100">
-                    <span className="text-rose-600 block mb-0.5">Failed</span>
-                    <span className="text-sm text-rose-700 font-mono">
-                      {record.provisioning_execution.metrics.failure_count}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Errors section */}
-              {record.provisioning_execution.errors &&
-                record.provisioning_execution.errors.length > 0 && (
-                  <div className="flex flex-col gap-2">
-                    <span className="text-[10px] font-black text-rose-600 uppercase tracking-wider block">
-                      Execution Fault Logs (
-                      {record.provisioning_execution.errors.length})
-                    </span>
-                    <div className="border border-rose-100 rounded-xl overflow-hidden text-[11px] bg-white max-h-48 overflow-y-auto shadow-inner">
-                      <table className="w-full border-collapse">
-                        <thead className="sticky top-0 bg-rose-50 z-10 text-rose-700 font-bold text-left">
-                          <tr className="border-b border-rose-100">
-                            <th className="p-2.5 w-20">Row Index</th>
-                            <th className="p-2.5 w-32">Identifier</th>
-                            <th className="p-2.5">Detailed Error Response</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-rose-50 text-slate-600 font-medium font-mono">
-                          {record.provisioning_execution.errors.map(
-                            (err: any, idx: number) => (
-                              <tr
-                                key={idx}
-                                className="hover:bg-rose-50/20 transition-colors"
-                              >
-                                <td className="p-2.5 text-rose-600 font-bold">
-                                  {err.row !== null ? `Row ${err.row}` : "—"}
-                                </td>
-                                <td className="p-2.5 text-slate-700 font-bold break-all">
-                                  {err.identifier}
-                                </td>
-                                <td className="p-2.5 text-slate-500 normal-case">
-                                  {err.reason}
-                                </td>
-                              </tr>
-                            ),
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-            </div>
-          )}
-
-          {/* Bulk Matrix File Interface Module */}
-          {isBulk && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col gap-4">
-              <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
-                <Layers className="h-4 w-4 text-indigo-600" />
-                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                  Target Subscribers List
-                </h3>
-              </div>
-
-              {/* Description Reference + File Action Downloader */}
-              <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 bg-slate-50/70 border border-slate-200/60 rounded-xl p-3">
-                <div className="text-xs space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                    List File Reference ID
-                  </span>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono font-bold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-sm">
-                      {newFileReferenceId
-                        ? newFileReferenceId
-                        : currentFileReferenceId || "No active file reference"}
-                    </span>
-                    <span className="text-[11px] font-bold text-slate-500 bg-slate-200/60 px-2 py-0.5 rounded">
-                      Count:{" "}
-                      <span className="text-slate-900 font-mono">
-                        {bulkMetrics.total}
-                      </span>{" "}
-                      subscribers
-                    </span>
-                    {newFileReferenceId && (
-                      <span className="text-[10px] text-indigo-600 font-bold animate-pulse">
-                        (Staged Overwrite)
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {record.input_file_url && !newFileReferenceId && (
-                  <button
-                    type="button"
-                    disabled={isDownloadingInput}
-                    onClick={handleSecureInputDownload}
-                    className="text-[10px] font-bold text-emerald-600 flex items-center gap-1.5 bg-emerald-50 px-3 py-2 border border-emerald-200/60 rounded-lg hover:bg-emerald-100/70 transition-colors shadow-sm disabled:opacity-50 h-8"
-                  >
-                    <FileDown className="h-3.5 w-3.5" />{" "}
-                    {isDownloadingInput
-                      ? "Streaming..."
-                      : "Download Original Input"}
-                  </button>
-                )}
-              </div>
-
-              {/* Dynamic Bottom Input Dropzones */}
-              {isEditing ? (
-                <div className="space-y-3 animate-in fade-in duration-200">
-                  {renderFileZone()}
-                </div>
-              ) : (
-                <div className="bg-slate-50 border border-slate-100 rounded-xl py-3 text-center text-slate-400 text-xs font-bold font-mono flex items-center justify-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                  SUBSCRIBER DATA LOCKED • EDIT WORKSPACE TO STAGE DATA
-                  REPLACEMENTS
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Sidebar Grid */}
-        <div className="lg:col-span-4 flex flex-col gap-6">
-          {/* WORKFLOW TRACKS CARD */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm flex flex-col gap-4">
-            <div className="flex justify-between items-center border-b border-slate-50 pb-2.5 gap-2">
-              <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest">
-                Workflow Status Tracks
-              </h2>
-              {getStatusBadge(record.status)}
-            </div>
-
-            {/* VISUAL 2-STEP WORKFLOW TIMELINE */}
-            <div className="relative pl-6 space-y-6 before:absolute before:bottom-2 before:top-2 before:left-[7px] before:w-[2px] before:bg-slate-100">
-              {/* STEP 1: SUBMISSION (ALWAYS SUCCESS / COMPLETED) */}
-              <div className="relative">
-                {/* Step Indicator Node */}
-                <span className="absolute -left-[23px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 ring-4 ring-white">
-                  <CheckCircle2 className="h-2.5 w-2.5 text-white" />
-                </span>
-
-                <div>
-                  <h4 className="text-[11px] font-bold text-slate-800 uppercase tracking-tight">
-                    Step 1: Request Initialization
-                  </h4>
-                  <div className="mt-1.5 p-2.5 rounded-xl bg-slate-50 border border-slate-100/70 text-[10px] font-medium text-slate-500 space-y-1">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400 font-bold flex items-center gap-1 uppercase tracking-wider">
-                        <User className="h-2.5 w-2.5" /> Requester
-                      </span>
-                      <span className="font-bold text-slate-700 font-mono">
-                        {record.requester_name ||
-                          `User ID #${record.requested_by_user_id}`}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400 font-bold flex items-center gap-1 uppercase tracking-wider">
-                        <Clock className="h-2.5 w-2.5" /> Registered
-                      </span>
-                      <span className="font-bold text-slate-600">
-                        {new Date(record.created_at).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* STEP 2: REVIEW CYCLE */}
-              <div className="relative">
-                {/* Dynamic Step Indicator Node */}
-                {record.status !== "pending" && record.status !== "rejected" ? (
-                  <span className="absolute -left-[23px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 ring-4 ring-white">
-                    <CheckCircle2 className="h-2.5 w-2.5 text-white" />
-                  </span>
-                ) : record.status === "rejected" ? (
-                  <span className="absolute -left-[23px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 ring-4 ring-white">
-                    <XCircle className="h-2.5 w-2.5 text-white" />
-                  </span>
-                ) : (
-                  <span className="absolute -left-[23px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 ring-4 ring-white animate-pulse">
-                    <Clock className="h-2.5 w-2.5 text-white" />
-                  </span>
-                )}
-
-                <div>
-                  <h4 className="text-[11px] font-bold text-slate-800 uppercase tracking-tight">
-                    Step 2: Operational Governance Review
-                  </h4>
-
-                  {record.status !== "pending" ? (
-                    <div
-                      className={cn(
-                        "mt-1.5 p-2.5 rounded-xl border text-[10px] font-medium space-y-1",
-                        record.status !== "rejected"
-                          ? "bg-indigo-50/40 border-indigo-100/70"
-                          : "bg-rose-50/40 border-rose-100/70",
-                      )}
-                    >
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-400 font-bold flex items-center gap-1 uppercase tracking-wider">
-                          <User className="h-2.5 w-2.5" /> Reviewed By
-                        </span>
-                        <span className="font-bold text-slate-700 font-mono">
-                          {record.reviewer_name ||
-                            `User ID #${record.reviewed_by_user_id ?? "N/A"}`}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-400 font-bold flex items-center gap-1 uppercase tracking-wider">
-                          <Clock className="h-2.5 w-2.5" /> Processed On
-                        </span>
-                        <span className="font-bold text-slate-600">
-                          {record.reviewed_at
-                            ? new Date(record.reviewed_at).toLocaleString()
-                            : "—"}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mt-1.5 p-3 rounded-xl bg-amber-50/40 border border-amber-100/50 text-[10px] font-semibold text-amber-800 flex items-center gap-2">
-                      <Clock
-                        className="h-3 w-3 text-amber-600 shrink-0 animate-spin"
-                        style={{ animationDuration: "3s" }}
-                      />
-                      Awaiting administration decision matrix review parameters.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* EVIDENCE DOCUMENTS CARD */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm flex flex-col gap-3">
-            <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest border-b border-slate-50 pb-2">
-              Evidence Documents ({attachments.length})
-            </h2>
-
-            {isEditing && (
-              <label className="border border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/20 rounded-xl p-3 text-center cursor-pointer flex flex-col items-center justify-center gap-1 text-[11px] font-bold text-indigo-600 shadow-sm group">
-                <Paperclip className="h-4 w-4 group-hover:scale-110 transition-transform" />
-                {isUploading
-                  ? "Uploading file stream..."
-                  : "Append Support Document Attachment"}
-                <input
-                  type="file"
-                  multiple
-                  onChange={handleAttachmentUpload}
-                  className="hidden"
-                  disabled={isUploading}
-                />
-              </label>
-            )}
-
-            <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
-              {attachments.length === 0 ? (
-                <div className="text-center p-4 bg-slate-50 rounded-xl text-slate-400 text-[10px] font-medium border border-slate-100">
-                  No verification attachments found.
-                </div>
-              ) : (
-                attachments.map((att) => (
-                  <div
-                    key={att.id}
-                    className="p-2 bg-slate-50/80 border border-slate-100 rounded-xl flex items-center justify-between text-xs font-medium"
-                  >
-                    <div className="flex items-center gap-1.5 min-w-0 flex-1 pr-2">
-                      <Paperclip className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
-                      <span
-                        className="truncate text-slate-800 font-bold text-[11px]"
-                        title={att.name}
-                      >
-                        {att.name}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      {record.attachments?.find(
-                        (raw: any) => String(raw.id) === att.id,
-                      )?.file_url && (
-                        <a
-                          href={
-                            record.attachments.find(
-                              (raw: any) => String(raw.id) === att.id,
-                            )?.file_url
-                          }
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      )}
-
-                      {isEditing && (
-                        <button
-                          type="button"
-                          onClick={() => removeAttachment(att.id)}
-                          className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Approve Overlay Dialog Box Modal */}
-      {isApproveModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4 animate-in fade-in duration-100">
-          <div className="bg-white w-full max-w-md rounded-2xl border border-slate-200 p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-100">
-            <div className="flex items-center justify-between border-b pb-2">
-              <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Confirm
-                Approval
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsApproveModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleApproveSubmit} className="space-y-4">
-              <div className="text-xs font-medium text-slate-600 leading-relaxed">
-                Are you sure you want to approve this reimbursement allocation
-                context? This operation commits data parameters to the active
-                processing layers.
-              </div>
-
-              <div className="flex items-center justify-end gap-2 border-t pt-2.5 border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsApproveModalOpen(false)}
-                  className="h-8 px-3 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isActioning}
-                  className="h-8 px-3.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-50"
-                >
-                  {isActioning ? "Processing..." : "Confirm Approval"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Rejection Overlay Dialog Box Modal Shell */}
-      {isRejectModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4 animate-in fade-in duration-100">
-          <div className="bg-white w-full max-w-md rounded-2xl border border-slate-200 p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-100">
-            <div className="flex items-center justify-between border-b pb-2">
-              <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight flex items-center gap-1.5">
-                <AlertCircle className="h-4 w-4 text-rose-500" /> Provide
-                Rejection Reason
-              </h3>
               <button
                 type="button"
                 onClick={() => {
-                  setIsRejectModalOpen(false);
-                  setRejectionReason("");
+                  setIsEditing(false);
+                  fetchDetails();
                 }}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
+                disabled={isSubmitting}
+                className="h-9 px-4 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 flex items-center gap-1.5 shadow-sm"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3.5 w-3.5" /> Discard
               </button>
-            </div>
-
-            <form onSubmit={handleRejectSubmit} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  Audit Explanation / Context Notes
-                </label>
-                <textarea
-                  required
-                  rows={3}
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  placeholder="Explain why this reimbursement ledger payload request is explicitly denied..."
-                  className="w-full text-xs font-medium font-mono p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-rose-500 text-slate-700 resize-none leading-relaxed"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 border-t pt-2.5 border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsRejectModalOpen(false);
-                    setRejectionReason("");
-                  }}
-                  className="h-8 px-3 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isActioning || !rejectionReason.trim()}
-                  className="h-8 px-3.5 bg-rose-600 text-white rounded-lg text-xs font-bold hover:bg-rose-700 transition-colors shadow-sm disabled:opacity-50"
-                >
-                  {isActioning ? "Processing..." : "Confirm Denial"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Cancel Overlay Dialog Box Modal */}
-      {isCancelModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4 animate-in fade-in duration-100">
-          <div className="bg-white w-full max-w-md rounded-2xl border border-slate-200 p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-100">
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4 animate-in fade-in duration-100">
-              <div className="bg-white w-full max-w-md rounded-2xl border border-slate-200 p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-100">
-                <div className="flex items-center justify-between border-b pb-2">
-                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight flex items-center gap-1.5">
-                    <Ban className="h-4 w-4 text-slate-500" /> Cancel Request
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => setIsCancelModalOpen(false)}
-                    className="text-slate-400 hover:text-slate-600 transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-
-                <form onSubmit={handleCancelSubmit} className="space-y-4">
-                  <div className="text-xs font-medium text-slate-600 leading-relaxed">
-                    Are you sure you want to cancel this pending reimbursement
-                    request? This state mutation transitions the item into an
-                    inactive ledger log.
-                  </div>
-
-                  <div className="flex items-center justify-end gap-2 border-t pt-2.5 border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => setIsCancelModalOpen(false)}
-                      className="h-8 px-3 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
-                    >
-                      Discard
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isActioning}
-                      className="h-8 px-3.5 bg-slate-800 text-white rounded-lg text-xs font-bold hover:bg-slate-900 transition-colors shadow-sm disabled:opacity-50"
-                    >
-                      {isActioning ? "Processing..." : "Confirm Cancellation"}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  function renderFileZone() {
-    if (isProcessingFile) {
-      return (
-        <div className="border border-dashed border-indigo-200 bg-indigo-50/20 rounded-xl p-6 text-center flex flex-col items-center justify-center gap-2">
-          <div className="h-5 w-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-xs font-bold text-indigo-700">
-            Streaming and validating file structure arrays...
-          </span>
-        </div>
-      );
-    }
-
-    if (!uploadedFile) {
-      return (
-        <div className="flex flex-col gap-2">
-          <div
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              if (e.dataTransfer.files?.[0])
-                handleFileIngestion(e.dataTransfer.files[0]);
-            }}
-            className="border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-white rounded-xl p-6 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1.5 relative"
-          >
-            <input
-              type="file"
-              accept=".csv, .txt, .xlsx, .xls"
-              onChange={(e) => {
-                if (e.target.files?.[0]) handleFileIngestion(e.target.files[0]);
-              }}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            />
-            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 shadow-sm">
-              <UploadCloud className="h-4 w-4" />
-            </div>
-            <div>
-              <span className="text-xs font-bold text-slate-700 block">
-                Drag & drop spreadsheet revision matrix, or browse local volumes
-              </span>
-              <span className="text-[10px] text-slate-400 font-medium">
-                Limits layout specifications: Max structural allowance 10MB
-              </span>
-            </div>
-          </div>
-
-          <div className="flex justify-end relative" ref={templateDropdownRef}>
+              <button
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="h-9 px-4 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 flex items-center gap-1.5 shadow-sm transition-colors disabled:opacity-50"
+              >
+                <Save className="h-3.5 w-3.5" />{" "}
+                {isSubmitting ? "Saving..." : "Save Changes"}
+              </button>
+            </>
+          ) : (
             <button
               type="button"
-              disabled={isDownloading}
-              onClick={() => setIsTemplateDropdownOpen(!isTemplateDropdownOpen)}
-              className="text-[10px] font-bold text-indigo-600 flex items-center gap-1 bg-white px-2.5 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-50"
+              onClick={() => setIsEditing(true)}
+              className="h-9 px-4 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 flex items-center gap-1.5 shadow-sm transition-colors"
             >
-              <Download className="h-3 w-3" />{" "}
-              {isDownloading ? "Exporting..." : "Export Blank Template Schema"}{" "}
-              <ChevronDown className="h-2.5 w-2.5" />
+              <Edit3 className="h-3.5 w-3.5" /> Edit Profile
             </button>
-
-            {isTemplateDropdownOpen && (
-              <div className="absolute right-0 bottom-full mb-1 bg-white border border-slate-200 shadow-xl rounded-lg w-40 py-1 z-50 animate-in fade-in slide-in-from-bottom-1 duration-100">
-                {(["xlsx", "csv", "txt"] as TemplateFormat[]).map((fmt) => (
-                  <button
-                    key={fmt}
-                    type="button"
-                    onClick={() => {
-                      handleCurrentSubscriberDownload(fmt);
-                      setIsTemplateDropdownOpen(false);
-                    }}
-                    className="w-full text-left px-3 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 block transition-colors"
-                  >
-                    Export .{fmt.toUpperCase()} Format
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
         </div>
-      );
-    }
+      </div>
 
-    return (
-      <div className="flex flex-col gap-3 bg-white p-3 border border-slate-200 rounded-xl animate-in fade-in duration-200">
-        <div className="p-2 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-            <FileText className="h-4 w-4 text-indigo-500" />
-            <span className="truncate max-w-[200px]">{uploadedFile.name}</span>
-            <span className="text-[9px] font-mono bg-indigo-50 text-indigo-700 px-2 rounded border border-indigo-100">
-              {newFileReferenceId}
-            </span>
-          </div>
+      <form
+        onSubmit={handleSubmit}
+        className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6"
+      >
+        {/* Header Action Section */}
+        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+            Engine Configurations
+          </span>
           <button
             type="button"
-            onClick={() => {
-              setUploadedFile(null);
-              setNewFileReferenceId(null);
-              setBulkErrors([]);
-            }}
-            className="p-1 text-slate-400 hover:text-red-500 rounded-lg transition-colors"
+            disabled={!isEditing}
+            onClick={() => setIsActive(!isActive)}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border transition-all shadow-sm",
+              isActive
+                ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                : "bg-slate-50 border-slate-200 text-slate-500",
+              !isEditing && "opacity-80 cursor-default",
+            )}
           >
-            <Trash2 className="h-4 w-4" />
+            {isActive ? (
+              <>
+                <ToggleRight className="h-4 w-4 text-emerald-600" /> Active
+              </>
+            ) : (
+              <>
+                <ToggleLeft className="h-4 w-4 text-slate-400" /> Disabled
+              </>
+            )}
           </button>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-bold">
-          <div className="bg-slate-50 rounded-lg p-2 border border-slate-100">
-            <span className="text-[9px] font-bold text-slate-400 block uppercase">
-              Staged Record Rows
-            </span>
-            <span className="text-sm font-black text-slate-700">
-              {bulkMetrics.total}
-            </span>
+        {/* Form Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+              <Layers className="h-3 w-3 text-slate-400" /> Profile Name{" "}
+              <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              disabled={!isEditing}
+              placeholder="e.g. Standard Core Reimbursement"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 transition-all disabled:opacity-70 disabled:bg-slate-100"
+            />
           </div>
-          <div className="bg-green-50/40 rounded-lg p-2 border border-green-100">
-            <span className="text-[9px] font-bold text-green-500 block uppercase">
-              Validated Elements
-            </span>
-            <span className="text-sm font-black text-green-700 flex items-center justify-center gap-0.5">
-              <CheckCircle2 className="h-3 w-3 text-green-500" />{" "}
-              {bulkMetrics.valid}
-            </span>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+              <Landmark className="h-3 w-3 text-slate-400" /> Funding Account
+              Link <span className="text-red-500">*</span>
+            </label>
+            <select
+              required
+              disabled={!isEditing}
+              value={fundingAccountId}
+              onChange={(e) => setFundingAccountId(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 transition-all disabled:opacity-70 disabled:bg-slate-100"
+            >
+              <option value="">
+                {isLoadingDropdowns
+                  ? "Fetching relations..."
+                  : "-- Select Linked Funding Node --"}
+              </option>
+              {fundingAccounts.map((acc) => (
+                <option key={acc.id} value={acc.id}>
+                  {acc.name} ({acc.msisdn})
+                </option>
+              ))}
+            </select>
           </div>
-          <div className="bg-red-50/40 rounded-lg p-2 border border-red-100">
-            <span className="text-[9px] font-bold text-red-500 block uppercase">
-              Rejected Errors
-            </span>
-            <span className="text-sm font-black text-red-700 flex items-center justify-center gap-0.5">
-              <AlertCircle className="h-3 w-3 text-red-500" />{" "}
-              {bulkMetrics.invalid}
-            </span>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+              Radio Reimbursement Type <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={reimbursementType}
+              disabled={!isEditing}
+              onChange={(e) => {
+                setReimbursementType(e.target.value);
+                if (e.target.value !== "BUNDLE")
+                  setSelectedBundleCategories([]);
+              }}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 transition-all disabled:opacity-70 disabled:bg-slate-100"
+            >
+              <option value="BUNDLE">Bundle</option>
+              <option value="AIRTIME">Airtime</option>
+            </select>
+
+            {reimbursementType === "BUNDLE" && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-600">
+                  Bundle Categories
+                </label>
+                <select
+                  multiple
+                  disabled={!isEditing}
+                  value={selectedBundleCategories}
+                  onChange={(e) =>
+                    setSelectedBundleCategories(
+                      Array.from(
+                        e.target.selectedOptions,
+                        (option) => option.value,
+                      ),
+                    )
+                  }
+                  className="w-full min-h-[180px] bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 transition-all disabled:opacity-70 disabled:bg-slate-100"
+                >
+                  {bundleCategories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+                {isEditing && (
+                  <span className="text-[11px] text-slate-400">
+                    Hold Ctrl (Windows/Linux) or Cmd (macOS) to select multiple
+                    categories.
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+              Execution Mode Runtime <span className="text-red-500">*</span>
+            </label>
+            <select
+              required
+              disabled={!isEditing}
+              value={executionMode}
+              onChange={(e) => setExecutionMode(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 transition-all cursor-pointer disabled:opacity-70 disabled:bg-slate-100"
+            >
+              <option value="COMMAND">
+                COMMAND - Execute provider command immediately
+              </option>
+              <option value="BATCH">
+                BATCH - Queue execution for batch processing
+              </option>
+            </select>
+            <p className="text-[11px] text-slate-400">
+              Defines how provisioning requests are dispatched to the execution
+              engine.
+            </p>
           </div>
         </div>
 
-        {bulkErrors.length > 0 && (
-          <div className="flex flex-col gap-1 animate-in slide-in-from-top-2 duration-200">
-            <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider block">
-              Ingesting Fault Diagnostics Logs
-            </span>
-            <div className="border border-red-100 rounded-lg overflow-hidden text-[11px] bg-white max-h-40 overflow-y-auto shadow-inner">
-              <table className="w-full border-collapse">
-                <thead className="sticky top-0 bg-red-50 z-10 text-red-700 font-bold text-left">
-                  <tr className="border-b border-red-100">
-                    <th className="p-2 w-16">Row ID</th>
-                    <th className="p-2 w-32">Identifier</th>
-                    <th className="p-2">
-                      Failure Reason Description Framework
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-red-50 text-slate-600 font-medium">
-                  {bulkErrors.map((err, idx) => (
-                    <tr
-                      key={`${err.row}-${idx}`}
-                      className="hover:bg-red-50/20 transition-colors"
-                    >
-                      <td className="p-2 font-bold font-mono text-red-600">
-                        Row {err.row}
-                      </td>
-                      <td className="p-2 font-mono text-slate-500 break-all">
-                        {err.identifier}
-                      </td>
-                      <td className="p-2 text-slate-500 leading-relaxed text-xs">
-                        {err.reason}
-                      </td>
-                    </tr>
+        {/* Pipeline Configuration */}
+        <div className="bg-slate-50 rounded-2xl border border-slate-100 p-5 space-y-5">
+          <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+            <Cpu className="h-4 w-4" /> Pipeline Configuration
+          </h2>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Provisioning */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+              <div>
+                <h3 className="text-sm font-bold text-slate-800">
+                  Provisioning
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Configure the provider and command responsible.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-bold text-slate-500">
+                  Provider Instance <span className="text-red-500">*</span>
+                </label>
+                <select
+                  required
+                  disabled={!isEditing}
+                  value={provisioningProviderInstanceId}
+                  onChange={(e) => {
+                    setProvisioningProviderInstanceId(e.target.value);
+                    setProvisioningCommandId(""); // Reset command selection when provider instance changes
+                  }}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 transition-all disabled:bg-slate-100"
+                >
+                  <option value="">
+                    {isLoadingDropdowns
+                      ? "Fetching provider instances..."
+                      : "-- Select Provider Instance --"}
+                  </option>
+                  {providerInstances.map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.name}
+                    </option>
                   ))}
-                </tbody>
-              </table>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-bold text-slate-500 flex items-center justify-between">
+                  <span>
+                    Provisioning Command <span className="text-red-500">*</span>
+                  </span>
+                  {loadingProvisioningCommands && (
+                    <Loader2 className="h-3 w-3 text-indigo-500 animate-spin" />
+                  )}
+                </label>
+                <select
+                  required
+                  disabled={
+                    !isEditing ||
+                    !provisioningProviderInstanceId ||
+                    loadingProvisioningCommands
+                  }
+                  value={provisioningCommandId}
+                  onChange={(e) => setProvisioningCommandId(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 transition-all disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  <option value="">
+                    {loadingProvisioningCommands
+                      ? "Fetching commands for category..."
+                      : !provisioningProviderInstanceId
+                        ? "-- Select Provider Instance First --"
+                        : "-- Select Command --"}
+                  </option>
+                  {provisioningCommands.map((command) => (
+                    <option key={command.id} value={command.id}>
+                      {command.name || `Command #${command.id}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Debit */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Debit</h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Configure how reimbursement debit requests are executed.
+                  </p>
+                </div>
+                <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    disabled={!isEditing}
+                    checked={debitByProvisioningProvider}
+                    onChange={(e) =>
+                      setDebitByProvisioningProvider(e.target.checked)
+                    }
+                    className="rounded border-slate-300 disabled:opacity-70"
+                  />
+                  Use provisioning provider
+                </label>
+              </div>
+
+              <div
+                className={cn(
+                  "space-y-4 transition-all",
+                  debitByProvisioningProvider &&
+                    "opacity-50 pointer-events-none",
+                )}
+              >
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-bold text-slate-500">
+                    Debit Provider Instance{" "}
+                    {!debitByProvisioningProvider && (
+                      <span className="text-red-500"> *</span>
+                    )}
+                  </label>
+                  <select
+                    required={!debitByProvisioningProvider}
+                    disabled={debitByProvisioningProvider || !isEditing}
+                    value={debitProviderInstanceId}
+                    onChange={(e) => {
+                      setDebitProviderInstanceId(e.target.value);
+                      setDebitCommandId(""); // Reset command when debit provider instance changes
+                    }}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 transition-all disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    <option value="">
+                      {isLoadingDropdowns
+                        ? "Fetching provider instances..."
+                        : "-- Select Provider Instance --"}
+                    </option>
+                    {providerInstances.map((provider) => (
+                      <option key={provider.id} value={provider.id}>
+                        {provider.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-bold text-slate-500 flex items-center justify-between">
+                    <span>
+                      Debit Command{" "}
+                      {!debitByProvisioningProvider && (
+                        <span className="text-red-500"> *</span>
+                      )}
+                    </span>
+                    {loadingDebitCommands && (
+                      <Loader2 className="h-3 w-3 text-indigo-500 animate-spin" />
+                    )}
+                  </label>
+                  <select
+                    required={!debitByProvisioningProvider}
+                    disabled={
+                      debitByProvisioningProvider ||
+                      !isEditing ||
+                      !debitProviderInstanceId ||
+                      loadingDebitCommands
+                    }
+                    value={debitCommandId}
+                    onChange={(e) => setDebitCommandId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500 transition-all disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    <option value="">
+                      {loadingDebitCommands
+                        ? "Fetching commands for category..."
+                        : !debitProviderInstanceId
+                          ? "-- Select Provider Instance First --"
+                          : "-- Select Command --"}
+                    </option>
+                    {debitCommands.map((command) => (
+                      <option key={command.id} value={command.id}>
+                        {command.name || `Command #${command.id}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {debitByProvisioningProvider && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+                  <p className="text-[11px] text-blue-700">
+                    Debit operations will reuse the provisioning provider
+                    instance and provisioning command. Separate debit
+                    configuration is ignored.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
-        )}
-      </div>
-    );
-  }
+        </div>
+      </form>
+    </div>
+  );
 }

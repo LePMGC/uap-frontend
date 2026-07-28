@@ -6,9 +6,7 @@ import {
   XCircle,
   Eye,
   DollarSign,
-  ThumbsUp,
   Ban,
-  Paperclip,
   Cpu,
   User,
   Activity,
@@ -24,43 +22,50 @@ import {
   reimbursementsService,
   type ReimbursementFilters,
 } from "@/services/reimbursementsService";
-import { BundleDisplay } from "@/components/reimbursements/BundleDisplay";
 
 export default function ReimbursementsPage() {
   const navigate = useNavigate();
   const { showToast } = useToastStore();
 
-  // --- AUTH & PERMISSIONS CONTROLS ---
+  // Permissions & Auth
   const user = useAuthStore((state) => state.user);
   const userPermissions = useMemo(() => user?.permissions || [], [user]);
 
-  const canViewAll = userPermissions.includes(PERM.VIEW_ALL_REIMBURSEMENTS);
-  const canViewOwn = userPermissions.includes(PERM.VIEW_OWN_REIMBURSEMENTS);
+  const canViewAll = useMemo(
+    () => userPermissions.includes(PERM.VIEW_ALL_REIMBURSEMENTS),
+    [userPermissions],
+  );
+  const canViewOwn = useMemo(
+    () => userPermissions.includes(PERM.VIEW_OWN_REIMBURSEMENTS),
+    [userPermissions],
+  );
 
-  const canCreateReimbursement =
-    userPermissions.includes(PERM.CREATE_SINGLE_REIMBURSEMENTS) ||
-    userPermissions.includes(PERM.CREATE_BULK_REIMBURSEMENTS);
+  const canCreateReimbursement = useMemo(
+    () =>
+      userPermissions.includes(PERM.CREATE_SINGLE_REIMBURSEMENTS) ||
+      userPermissions.includes(PERM.CREATE_BULK_REIMBURSEMENTS),
+    [userPermissions],
+  );
 
-  // --- EXPANDED STATE MANAGEMENT ---
+  // States
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Advanced Filter States
+  // Filters
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
-  const [tierFilter, setTierFilter] = useState("");
+  const [tierFilter] = useState("");
   const [modeFilter, setModeFilter] = useState("");
   const [createdByFilter, setCreatedByFilter] = useState<string>("");
   const [reviewedByFilter, setReviewedByFilter] = useState<string>("");
 
-  // Creation Date Range Filter Boundaries
   const [createdAtStart, setCreatedAtStart] = useState("");
   const [createdAtEnd, setCreatedAtEnd] = useState("");
+
   const [requesters, setRequesters] = useState<{ id: number; name: string }[]>(
     [],
   );
-
   const [reviewers, setReviewers] = useState<{ id: number; name: string }[]>(
     [],
   );
@@ -80,7 +85,7 @@ export default function ReimbursementsPage() {
     performance: { success_rate: 0 },
   });
 
-  // --- DATA FETCHING ---
+  // Data Loading Lifecycle
   const fetchData = useCallback(async () => {
     if (!canViewAll && !canViewOwn) {
       setLoading(false);
@@ -89,36 +94,29 @@ export default function ReimbursementsPage() {
 
     setLoading(true);
     try {
-      // Mapping comprehensive filters seamlessly onto api transmission layer
       const filters: ReimbursementFilters = {
         search: searchQuery,
         status: (statusFilter as any) || undefined,
         reimbursement_type: (typeFilter as any) || undefined,
         required_tier: tierFilter ? Number(tierFilter) : undefined,
         reimbursement_mode: (modeFilter as any) || undefined,
-        //bundle: [],
         created_by: createdByFilter || undefined,
         reviewed_by: reviewedByFilter || undefined,
         created_at_start: createdAtStart || undefined,
         created_at_end: createdAtEnd || undefined,
       };
 
-      // If search query looks like an exact MSISDN, feed it into the structured parameter field
-      /* if (/^\d+$/.test(searchQuery)) {
-        filters.msisdn = searchQuery;
-      } */
-
-      const response = await reimbursementsService.getReimbursements(
-        pagination.current_page,
-        pagination.per_page,
-        filters,
-      );
+      const [response, statsRes] = await Promise.all([
+        reimbursementsService.getReimbursements(
+          pagination.current_page,
+          pagination.per_page,
+          filters,
+        ),
+        reimbursementsService.getStats(),
+      ]);
 
       if (response) {
-        // Cast response to any temporarily so TypeScript allows checking your nested backend fields
         const rawResponse = response as any;
-
-        // Extract the true array records safely
         const records =
           rawResponse.data &&
           typeof rawResponse.data === "object" &&
@@ -130,27 +128,29 @@ export default function ReimbursementsPage() {
 
         setData(records);
 
-        // Extract pagination meta safely wherever your backend paginator nested them
         const meta = rawResponse.meta || rawResponse.data?.meta || rawResponse;
-
-        setPagination({
+        setPagination((prev) => ({
+          ...prev,
           current_page: meta?.current_page || 1,
           total: meta?.total || 0,
           last_page: meta?.last_page || 1,
           per_page: meta?.per_page || 10,
           from: meta?.from || 0,
           to: meta?.to || 0,
-        });
+        }));
       }
 
-      const statsRes = await reimbursementsService.getStats();
-      if (statsRes.success) setStats(statsRes.data);
+      if (statsRes?.success) {
+        setStats(statsRes.data);
+      }
     } catch (error) {
       showToast("Failed to load reimbursements", "error");
     } finally {
       setLoading(false);
     }
   }, [
+    canViewAll,
+    canViewOwn,
     pagination.current_page,
     pagination.per_page,
     searchQuery,
@@ -163,306 +163,349 @@ export default function ReimbursementsPage() {
     createdAtStart,
     createdAtEnd,
     showToast,
-    canViewAll,
-    canViewOwn,
   ]);
-
-  const tableFilters = [
-    {
-      id: "status",
-      custom: (
-        <select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            setPagination((p) => ({ ...p, current_page: 1 }));
-          }}
-          className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 h-9"
-        >
-          <option value="">All Statuses</option>
-          <option value="pending">Pending Approval</option>
-          <option value="approved">Approved Queue</option>
-          <option value="success">Provisioned Successfully</option>
-          <option value="rejected">Rejected Requests</option>
-          <option value="failed">System Failed</option>
-        </select>
-      ),
-    },
-
-    {
-      id: "type",
-      custom: (
-        <select
-          value={typeFilter}
-          onChange={(e) => {
-            setTypeFilter(e.target.value);
-            setPagination((p) => ({ ...p, current_page: 1 }));
-          }}
-          className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 h-9"
-        >
-          <option value="">All Resource Types</option>
-          <option value="AIRTIME">Airtime Topups</option>
-          <option value="BUNDLE">Data/Bundle Packages</option>
-        </select>
-      ),
-    },
-
-    {
-      id: "creator",
-      custom: (
-        <select
-          value={createdByFilter}
-          onChange={(e) => {
-            setCreatedByFilter(e.target.value);
-            setPagination((p) => ({ ...p, current_page: 1 }));
-          }}
-          className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 h-9"
-        >
-          <option value="">All Requesters</option>
-
-          {requesters.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.name}
-            </option>
-          ))}
-        </select>
-      ),
-    },
-
-    {
-      id: "reviewer",
-      custom: (
-        <select
-          value={reviewedByFilter}
-          onChange={(e) => {
-            setReviewedByFilter(e.target.value);
-            setPagination((p) => ({ ...p, current_page: 1 }));
-          }}
-          className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 h-9"
-        >
-          <option value="">All Reviewers</option>
-
-          {reviewers.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.name}
-            </option>
-          ))}
-        </select>
-      ),
-    },
-
-    {
-      id: "mode",
-      custom: (
-        <select
-          value={modeFilter}
-          onChange={(e) => {
-            setModeFilter(e.target.value);
-            setPagination((p) => ({ ...p, current_page: 1 }));
-          }}
-          className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 h-9"
-        >
-          <option value="">All Execution Modes</option>
-          <option value="AUTO">Automated (AUTO)</option>
-          <option value="MANUAL">Manual Processing</option>
-        </select>
-      ),
-    },
-
-    {
-      id: "date-range",
-      custom: (
-        <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 h-9">
-          <Calendar className="h-3 w-3 text-slate-400 mr-1" />
-
-          <input
-            type="date"
-            value={createdAtStart}
-            onChange={(e) => {
-              setCreatedAtStart(e.target.value);
-              setPagination((p) => ({ ...p, current_page: 1 }));
-            }}
-            className="bg-transparent text-[11px] outline-none"
-          />
-
-          <span className="text-[10px]">to</span>
-
-          <input
-            type="date"
-            value={createdAtEnd}
-            onChange={(e) => {
-              setCreatedAtEnd(e.target.value);
-              setPagination((p) => ({ ...p, current_page: 1 }));
-            }}
-            className="bg-transparent text-[11px] outline-none"
-          />
-        </div>
-      ),
-    },
-  ];
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Fetch Filters
   useEffect(() => {
+    let isMounted = true;
     const loadFilters = async () => {
       try {
         const [creatorsRes, reviewersRes] = await Promise.all([
           reimbursementsService.getCreators(),
           reimbursementsService.getReviewers(),
         ]);
-
-        setRequesters(creatorsRes.data);
-        setReviewers(reviewersRes.data);
+        if (isMounted) {
+          setRequesters(creatorsRes.data || []);
+          setReviewers(reviewersRes.data || []);
+        }
       } catch (error) {
         console.error("Failed loading reimbursement filters", error);
       }
     };
 
     loadFilters();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // --- TABLE COLUMN CONFIGURATION ---
-  const columns = [
-    {
-      header: "Ticket Context",
-      accessor: (item: any) => (
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-indigo-50 rounded-lg border border-indigo-100 text-indigo-600">
-            <DollarSign className="h-4 w-4" />
-          </div>
-          <div>
-            <span className="block font-bold text-slate-900">
-              {item.ticket_id}
-            </span>
-            <span className="block text-[10px] text-slate-400 font-bold tracking-wider uppercase">
-              {item.reimbursement_type || "BUNDLE"}
-            </span>
-            {item.description && (
-              <span className="block text-[11px] text-slate-500 max-w-xs truncate mt-0.5 italic">
-                "{item.description}"
-              </span>
-            )}
-          </div>
-        </div>
-      ),
-    },
-    {
-      header: "Target Subscriber",
-      accessor: (item: any) => (
-        <div className="flex flex-col">
-          <span className="text-xs font-bold text-slate-700">
-            {item.msisdn}
-          </span>
-          <span className="text-[10px] text-slate-400 font-mono">
-            {item.is_bulk ? "Batch File Processing" : "Single Account Input"}
-          </span>
-        </div>
-      ),
-    },
-    {
-      header: "Bundle / Airtime",
-      accessor: (item: any) => (
-        <div className="space-y-1.5">
-          <span className="block text-xs font-medium text-slate-600">
-            {item.bundle ? item.bundle.name : `${item.amount} Airtime`}
-          </span>
-          <span
-            className={cn(
-              "inline-flex items-center gap-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border",
-              item.reimbursement_mode === "AUTO"
-                ? "bg-purple-50 text-purple-600 border-purple-100"
-                : "bg-orange-50 text-orange-600 border-orange-100",
-            )}
+  const tableFilters = useMemo(
+    () => [
+      {
+        id: "status",
+        custom: (
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPagination((p) => ({ ...p, current_page: 1 }));
+            }}
+            className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 h-9"
           >
-            {item.reimbursement_mode === "AUTO" ? (
-              <Cpu className="h-2.5 w-2.5" />
-            ) : (
-              <User className="h-2.5 w-2.5" />
-            )}
-            {item.reimbursement_mode || "AUTO"}
-          </span>
-        </div>
-      ),
-    },
-    {
-      header: "Status",
-      accessor: (item: any) => {
-        const variants: any = {
-          success:
-            "bg-emerald-100 text-emerald-800 border-emerald-200 font-black",
-          approved: "bg-green-50 text-green-700 border-green-100",
-          pending: "bg-blue-50 text-blue-700 border-blue-100 animate-pulse",
-          rejected: "bg-red-50 text-red-700 border-red-100",
-          failed: "bg-amber-50 text-amber-700 border-amber-100",
-        };
-        return (
-          <div className="space-y-1">
+            <option value="">All Statuses</option>
+            <optgroup label="Workflow Status">
+              <option value="pending">Pending Approval</option>
+              <option value="rejected">Rejected</option>
+            </optgroup>
+            <optgroup label="Approval & Fulfillment">
+              <option value="approved">Approved (All)</option>
+              <option value="queued">Approved & Provisioning Queued</option>
+              <option value="success">Approved & Fulfilled (Success)</option>
+              <option value="failed">Approved & Provisioning Failed</option>
+            </optgroup>
+          </select>
+        ),
+      },
+      {
+        id: "type",
+        custom: (
+          <select
+            value={typeFilter}
+            onChange={(e) => {
+              setTypeFilter(e.target.value);
+              setPagination((p) => ({ ...p, current_page: 1 }));
+            }}
+            className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 h-9"
+          >
+            <option value="">All Resource Types</option>
+            <option value="AIRTIME">Airtime Topups</option>
+            <option value="BUNDLE">Data/Bundle Packages</option>
+          </select>
+        ),
+      },
+      {
+        id: "creator",
+        custom: (
+          <select
+            value={createdByFilter}
+            onChange={(e) => {
+              setCreatedByFilter(e.target.value);
+              setPagination((p) => ({ ...p, current_page: 1 }));
+            }}
+            className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 h-9"
+          >
+            <option value="">All Requesters</option>
+            {requesters.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+        ),
+      },
+      {
+        id: "reviewer",
+        custom: (
+          <select
+            value={reviewedByFilter}
+            onChange={(e) => {
+              setReviewedByFilter(e.target.value);
+              setPagination((p) => ({ ...p, current_page: 1 }));
+            }}
+            className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 h-9"
+          >
+            <option value="">All Reviewers</option>
+            {reviewers.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+        ),
+      },
+      {
+        id: "mode",
+        custom: (
+          <select
+            value={modeFilter}
+            onChange={(e) => {
+              setModeFilter(e.target.value);
+              setPagination((p) => ({ ...p, current_page: 1 }));
+            }}
+            className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 h-9"
+          >
+            <option value="">All Execution Modes</option>
+            <option value="AUTO">Automated (AUTO)</option>
+            <option value="MANUAL">Manual Processing</option>
+          </select>
+        ),
+      },
+      {
+        id: "date-range",
+        custom: (
+          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 h-9">
+            <Calendar className="h-3 w-3 text-slate-400 mr-1" />
+            <input
+              type="date"
+              value={createdAtStart}
+              onChange={(e) => {
+                setCreatedAtStart(e.target.value);
+                setPagination((p) => ({ ...p, current_page: 1 }));
+              }}
+              className="bg-transparent text-[11px] outline-none"
+            />
+            <span className="text-[10px]">to</span>
+            <input
+              type="date"
+              value={createdAtEnd}
+              onChange={(e) => {
+                setCreatedAtEnd(e.target.value);
+                setPagination((p) => ({ ...p, current_page: 1 }));
+              }}
+              className="bg-transparent text-[11px] outline-none"
+            />
+          </div>
+        ),
+      },
+    ],
+    [
+      statusFilter,
+      typeFilter,
+      createdByFilter,
+      reviewedByFilter,
+      modeFilter,
+      createdAtStart,
+      createdAtEnd,
+      requesters,
+      reviewers,
+    ],
+  );
+
+  // Table Columns Setup
+  const columns = useMemo(
+    () => [
+      {
+        header: "Ticket Context",
+        accessor: (item: any) => (
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-indigo-50 rounded-lg border border-indigo-100 text-indigo-600">
+              <DollarSign className="h-4 w-4" />
+            </div>
+            <div>
+              <span className="block font-bold text-slate-900">
+                {item.ticket_id}
+              </span>
+              <span className="block text-[10px] text-slate-400 font-bold tracking-wider uppercase">
+                {item.reimbursement_type || "BUNDLE"}
+              </span>
+              {item.description && (
+                <span className="block text-[11px] text-slate-500 max-w-xs truncate mt-0.5 italic">
+                  "{item.description}"
+                </span>
+              )}
+            </div>
+          </div>
+        ),
+      },
+      {
+        header: "Target Subscriber",
+        accessor: (item: any) => (
+          <div className="flex flex-col">
+            <span className="text-xs font-bold text-slate-700">
+              {item.msisdn}
+            </span>
+            <span className="text-[10px] text-slate-400 font-mono">
+              {item.is_bulk ? "Batch File Processing" : "Single Account Input"}
+            </span>
+          </div>
+        ),
+      },
+      {
+        header: "Bundle / Airtime",
+        accessor: (item: any) => (
+          <div className="space-y-1.5">
+            <span className="block text-xs font-medium text-slate-600">
+              {item.bundle ? item.bundle.name : `${item.amount} Airtime`}
+            </span>
             <span
               className={cn(
-                "inline-block px-2.5 py-1 rounded-full border text-[10px] font-black uppercase tracking-wider",
-                variants[item.status] || "bg-slate-50",
+                "inline-flex items-center gap-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border",
+                item.reimbursement_mode === "AUTO"
+                  ? "bg-purple-50 text-purple-600 border-purple-100"
+                  : "bg-orange-50 text-orange-600 border-orange-100",
               )}
             >
-              {item.status === "success" ? "✓ Provisioned" : item.status}
+              {item.reimbursement_mode === "AUTO" ? (
+                <Cpu className="h-2.5 w-2.5" />
+              ) : (
+                <User className="h-2.5 w-2.5" />
+              )}
+              {item.reimbursement_mode || "AUTO"}
             </span>
-            {item.status === "rejected" && item.rejection_reason && (
-              <span className="block text-[10px] text-red-500 font-medium max-w-[180px] break-words">
-                Reason: {item.rejection_reason}
-              </span>
-            )}
           </div>
-        );
+        ),
       },
-    },
-    {
-      header: "Creation Date",
-      accessor: (item: any) => (
-        <span className="text-xs text-slate-600 font-medium">
-          {item.created_at
-            ? new Date(item.created_at).toLocaleString("en-GB", {
-                day: "2-digit",
-                month: "short",
-                hour: "2-digit",
-                minute: "2-digit",
-              })
-            : "---"}
-        </span>
-      ),
-    },
-    {
-      header: "Requested By",
-      accessor: (item: any) => (
-        <span className="text-xs text-slate-600 font-medium">
-          {item.requester_name || "---"}
-        </span>
-      ),
-    },
-  ];
+      {
+        header: "Status & Execution",
+        accessor: (item: any) => {
+          const approvalVariants: Record<string, string> = {
+            pending: "bg-blue-50 text-blue-700 border-blue-200",
+            approved: "bg-emerald-50 text-emerald-700 border-emerald-200",
+            rejected: "bg-rose-50 text-rose-700 border-rose-200",
+            cancelled: "bg-slate-50 text-slate-600 border-slate-200",
+          };
 
-  // --- ACTIONS CONTROLLER & SECURITY ENFORCEMENT ---
-  const verifyApprovalPrivileges = (item: any): boolean => {
-    const isMaker = String(item?.requested_by_user_id) === String(user?.id);
-    if (isMaker) return false;
+          const provisioningVariants: Record<
+            string,
+            { label: string; style: string }
+          > = {
+            SUCCESS: {
+              label: "Fulfilled",
+              style:
+                "bg-emerald-100 text-emerald-800 border-emerald-300 font-semibold",
+            },
+            FAILED: {
+              label: "Provisioning Failed",
+              style:
+                "bg-amber-100 text-amber-800 border-amber-300 font-semibold",
+            },
+            IN_PROGRESS: {
+              label: "Provisioning...",
+              style:
+                "bg-purple-50 text-purple-700 border-purple-200 animate-pulse",
+            },
+            PENDING: {
+              label: "Queued",
+              style: "bg-slate-100 text-slate-700 border-slate-200",
+            },
+          };
 
-    if (item.required_tier === 3)
-      return userPermissions.includes(PERM.APPROVE_TIER3_REIMBURSEMENTS);
-    if (item.required_tier === 2)
-      return userPermissions.includes(PERM.APPROVE_TIER2_REIMBURSEMENTS);
-    return userPermissions.includes(PERM.APPROVE_TIER1_REIMBURSEMENTS);
-  };
+          const provInfo = item.provisioning_status
+            ? provisioningVariants[item.provisioning_status]
+            : null;
 
-  const actions = [
-    {
-      label: "View Request Details",
-      icon: <Eye className="h-3.5 w-3.5" />,
-      onClick: (item: any) => navigate(`/reimbursements/${item.id}`),
-    },
-  ];
+          return (
+            <div className="flex flex-col items-start gap-1">
+              <span
+                className={cn(
+                  "inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider",
+                  approvalVariants[item.status] || "bg-slate-50 text-slate-600",
+                )}
+              >
+                {item.status}
+              </span>
 
-  // Multi-selector configuration mapped directly into GenericDataTable select layers
+              {item.status === "approved" && provInfo && (
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] border",
+                    provInfo.style,
+                  )}
+                >
+                  <Cpu className="h-2.5 w-2.5" />
+                  {provInfo.label}
+                </span>
+              )}
+
+              {item.status === "rejected" && item.rejection_reason && (
+                <span className="text-[10px] text-rose-600 font-medium max-w-[180px] truncate">
+                  Reason: {item.rejection_reason}
+                </span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        header: "Creation Date",
+        accessor: (item: any) => (
+          <span className="text-xs text-slate-600 font-medium">
+            {item.created_at
+              ? new Date(item.created_at).toLocaleString("en-GB", {
+                  day: "2-digit",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "---"}
+          </span>
+        ),
+      },
+      {
+        header: "Requested By",
+        accessor: (item: any) => (
+          <span className="text-xs text-slate-600 font-medium">
+            {item.requester_name || "---"}
+          </span>
+        ),
+      },
+    ],
+    [],
+  );
+
+  const actions = useMemo(
+    () => [
+      {
+        label: "View Request Details",
+        icon: <Eye className="h-3.5 w-3.5" />,
+        onClick: (item: any) => navigate(`/reimbursements/${item.id}`),
+      },
+    ],
+    [navigate],
+  );
 
   if (!canViewAll && !canViewOwn) {
     return (
@@ -475,7 +518,7 @@ export default function ReimbursementsPage() {
 
   return (
     <div className="p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
-      {/* 6-COLUMN DASHBOARD COUNTER METRICS */}
+      {/* Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
         {[
           {
@@ -538,7 +581,6 @@ export default function ReimbursementsPage() {
         ))}
       </div>
 
-      {/* COMPONENT INVOCATION LINKED TO ALL MULTI-SELECT FILTER CONFIGS */}
       <GenericDataTable
         title="Reimbursements"
         data={data}
@@ -550,19 +592,13 @@ export default function ReimbursementsPage() {
         searchWidth="w-full md:w-64"
         onSearchChange={(val) => {
           setSearchQuery(val);
-          setPagination((prev) => ({
-            ...prev,
-            current_page: 1,
-          }));
+          setPagination((prev) => ({ ...prev, current_page: 1 }));
         }}
         isLoading={loading}
         showAdd={canCreateReimbursement}
         onAddClick={() => navigate("/reimbursements/create")}
         onPageChange={(page) =>
-          setPagination((prev) => ({
-            ...prev,
-            current_page: page,
-          }))
+          setPagination((prev) => ({ ...prev, current_page: page }))
         }
         onPageSizeChange={(size) =>
           setPagination((prev) => ({
