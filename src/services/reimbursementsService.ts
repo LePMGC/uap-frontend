@@ -80,8 +80,9 @@ export interface ReimbursementCreationPayload {
   msisdn?: string;
   is_bulk: boolean;
   description?: string;
-  file_reference_id?: string; // Reference to bulk file upload instance if applicable
-  attachment_ids?: (string | number)[]; // Pre-uploaded attachment array IDs from UAP file storage layer
+  file_reference_id?: string;
+  attachment_ids?: (string | number)[];
+  distribution_mode: "SINGLE_SINGLE" | "MANY_SINGLE" | "MANY_MANY";
 }
 
 // --- FILE ANALYSIS ENGINE INTERFACES ---

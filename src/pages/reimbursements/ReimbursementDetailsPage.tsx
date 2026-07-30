@@ -458,7 +458,9 @@ export default function ReimbursementDetailsPage() {
     setBulkErrors([]);
 
     try {
+      // Calculate distribution mode based on whether a target product/bundle is selected
       const distributionMode = targetProductId ? "MANY_SINGLE" : "MANY_MANY";
+
       const response = await reimbursementsService.validateInboundSheet(
         file,
         distributionMode,
@@ -550,11 +552,19 @@ export default function ReimbursementDetailsPage() {
       );
     }
 
+    const distributionMode: "SINGLE_SINGLE" | "MANY_SINGLE" | "MANY_MANY" =
+      isBulk
+        ? targetProductId
+          ? "MANY_SINGLE"
+          : "MANY_MANY"
+        : "SINGLE_SINGLE";
+
     const payload = {
       ticket_id: ticketId,
       description: description,
       reimbursement_type: reimbursementType,
       reimbursement_mode: reimbursementMode,
+      distribution_mode: distributionMode,
       is_bulk: isBulk,
       msisdn: !isBulk ? msisdn.trim() : undefined,
       target_product_id:

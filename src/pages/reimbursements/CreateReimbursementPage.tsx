@@ -326,6 +326,7 @@ export default function CreateReimbursementPage() {
       reimbursement_type: reimbursementType,
       reimbursement_mode: reimbursementMode,
       is_bulk: distributionMode !== "SINGLE_SINGLE",
+      distribution_mode: distributionMode,
       description: description,
       target_product_id:
         reimbursementType === "BUNDLE" ? targetProductId : undefined,
