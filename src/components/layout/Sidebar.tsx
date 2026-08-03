@@ -1,4 +1,5 @@
 // /var/www/html/uap-frontend/src/components/navigation/Sidebar.tsx
+import { useState } from "react";
 import {
   LayoutDashboard,
   PlayCircle,
@@ -14,6 +15,7 @@ import {
   ChevronRight,
   ListFilter,
   ReceiptEuro,
+  Globe,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { cn } from "@/lib/utils";
@@ -21,6 +23,7 @@ import { useNavigate, Link, useLocation } from "react-router-dom";
 import { HasPermission } from "@/components/auth/HasPermission";
 import { PERM } from "@/types/auth";
 import { useTabStore } from "@/store/tabStore";
+import { useTranslation } from "react-i18next";
 
 // Mapping menu groups and granular item endpoints to explicit security strings
 const menuGroups = [
@@ -39,7 +42,6 @@ const menuGroups = [
       PERM.VIEW_OWN_REIMBURSEMENTS,
     ],
     items: [
-      // Dashboard is usually open to anyone who has access to general operations
       {
         name: "Dashboard",
         icon: LayoutDashboard,
@@ -153,6 +155,11 @@ const menuGroups = [
   },
 ];
 
+const LANGUAGES = [
+  { code: "en", label: "English" },
+  { code: "fr", label: "Français" },
+];
+
 const getFeatureKey = (path: string) =>
   path.replace(/^\/+|\/+$/g, "").split("/")[0];
 
@@ -162,6 +169,11 @@ export function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const addTab = useTabStore((state) => state.addTab);
+  const { t, i18n } = useTranslation();
+
+  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    i18n.changeLanguage(e.target.value);
+  };
 
   const handleLogout = () => {
     logout();
@@ -190,7 +202,6 @@ export function Sidebar() {
                     getFeatureKey(item.url);
 
                   return (
-                    /* Wrap the granular link inside a single string validation check */
                     <HasPermission
                       key={item.name}
                       permission={item.requiredPermission}
@@ -237,18 +248,29 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Bottom Profile and Build Info Section */}
+      {/* Bottom Profile, Language Switcher, and Build Info Section */}
       <div className="mt-auto">
-        <div className="px-4 py-3 border-t border-slate-100 bg-slate-50/30">
-          <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">
-            System
+        {/* Language Picker */}
+        <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50/20 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold">
+            <Globe className="h-3.5 w-3.5 text-indigo-500" />
+            <span>{t("sidebar.language")}</span>
           </div>
-          <div className="text-xs text-slate-600 font-medium">
-            UAP v2.4.1
-            <span className="text-slate-400 ml-1">(Build 892)</span>
-          </div>
+
+          <select
+            value={i18n.language?.split("-")[0] || "en"}
+            onChange={handleLanguageChange}
+            className="text-xs font-bold bg-white text-slate-700 border border-slate-200 rounded-lg px-2 py-1 outline-none focus:border-indigo-500 cursor-pointer shadow-sm transition-colors"
+          >
+            {LANGUAGES.map((lang) => (
+              <option key={lang.code} value={lang.code}>
+                {lang.label}
+              </option>
+            ))}
+          </select>
         </div>
 
+        {/* User Profile & Logout */}
         <div className="p-4 border-t border-slate-100 bg-slate-50/40">
           <div className="flex items-center gap-3 mb-4 px-2">
             <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-xs shadow-md border-2 border-white">
@@ -273,7 +295,7 @@ export function Sidebar() {
               className="flex items-center justify-center gap-2 py-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-[11px] font-bold hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 transition-all shadow-sm active:scale-95"
             >
               <UserCircle className="h-3.5 w-3.5" />
-              Profile
+              {t("sidebar.profile")}
             </button>
 
             <button
@@ -281,7 +303,7 @@ export function Sidebar() {
               className="flex items-center justify-center gap-2 py-2 rounded-lg border border-red-100 bg-white text-red-600 text-[11px] font-bold hover:bg-red-50 hover:border-red-200 transition-all shadow-sm active:scale-95"
             >
               <LogOut className="h-3.5 w-3.5" />
-              Logout
+              {t("sidebar.logout")}
             </button>
           </div>
         </div>
