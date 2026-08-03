@@ -27,9 +27,11 @@ import {
   ThumbsUp,
   ThumbsDown,
   Ban,
-  Cpu,
   Terminal,
-  AlertTriangle,
+  Activity,
+  CheckCircle,
+  XCircle as XCircleIcon,
+  Layers as LayersIcon,
   Bot,
 } from "lucide-react";
 import {
@@ -67,35 +69,26 @@ interface BackendBundleItem {
   validity_units: string;
 }
 
-interface ProvisioningMetrics {
-  total_records?: number;
-  processed_count?: number;
-  success_count?: number;
-  failure_count?: number;
-  progress_pct?: number;
-}
-
-interface ProvisioningReports {
-  summary_url?: string | null;
-  errors_csv?: string | null;
-  full_report?: string | null;
-}
-
-interface ProvisioningError {
-  row?: number;
-  identifier?: string;
-  reason?: string;
+interface AdminReference {
+  command_log_id?: string | number | null;
+  batch_job_id?: string | number | null;
 }
 
 interface ProvisioningExecution {
-  id: number;
   status: string;
-  execution_type: "COMMAND" | "BATCH";
+  execution_type: "COMMAND" | "BATCH" | string;
   started_at?: string | null;
   completed_at?: string | null;
-  metrics?: ProvisioningMetrics | null;
-  errors?: ProvisioningError[];
-  reports?: ProvisioningReports | null;
+  total_input?: number;
+  total_processed?: number;
+  total_success?: number;
+  total_failed?: number;
+  admin_reference?: AdminReference | null;
+  reports?: {
+    summary_url?: string | null;
+    errors_csv?: string | null;
+    full_report?: string | null;
+  } | null;
 }
 
 interface ReimbursementItem extends Omit<
@@ -108,6 +101,7 @@ interface ReimbursementItem extends Omit<
   | "input_file_records_count"
 > {
   status?: string;
+  provisioning_status?: string;
   provisioning_execution?: ProvisioningExecution | null;
   attachments?: ReimbursementAttachment[];
   bulk_metrics?: IngestionMetrics;
@@ -218,6 +212,8 @@ export default function ReimbursementDetailsPage() {
 
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isDownloadingReport, setIsDownloadingReport] =
+    useState<boolean>(false);
 
   // Outside click handler
   useEffect(() => {
@@ -318,11 +314,11 @@ export default function ReimbursementDetailsPage() {
       setReimbursementType(data.reimbursement_type);
       setReimbursementMode(data.reimbursement_mode);
       setIsBulk(!!data.is_bulk);
-      setMsisdn((data as any).msisdn || "");
+      setMsisdn(data.msisdn || "");
       setTargetProductId(
         data.target_product_id ? String(data.target_product_id) : "",
       );
-      setBundle(data.bundle || null);
+      setBundle(data.target_product || data.bundle || null);
       setAmount(
         data.amount !== null && data.amount !== undefined
           ? String(data.amount)
@@ -458,7 +454,6 @@ export default function ReimbursementDetailsPage() {
     setBulkErrors([]);
 
     try {
-      // Calculate distribution mode based on whether a target product/bundle is selected
       const distributionMode = targetProductId ? "MANY_SINGLE" : "MANY_MANY";
 
       const response = await reimbursementsService.validateInboundSheet(
@@ -586,6 +581,19 @@ export default function ReimbursementDetailsPage() {
       showToast("Failed to commit ledger synchronization updates.", "error");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDownloadProvisioningReport = async () => {
+    if (!id) return;
+    try {
+      setIsDownloadingReport(true);
+      await reimbursementsService.downloadProvisioningReport(id);
+      showToast("Provisioning report downloaded successfully.", "success");
+    } catch (error) {
+      showToast("Failed to download provisioning report.", "error");
+    } finally {
+      setIsDownloadingReport(false);
     }
   };
 
@@ -908,7 +916,8 @@ export default function ReimbursementDetailsPage() {
             </>
           )}
 
-          {!terminalState && canModify && (
+          {/* Only show Edit Request Form when the reimbursement is still in pending status */}
+          {!terminalState && canModify && record.status === "pending" && (
             <div className="flex items-center gap-2">
               {isEditing ? (
                 <>
@@ -1253,7 +1262,12 @@ export default function ReimbursementDetailsPage() {
               ) : (
                 <span className="font-bold text-slate-900 mt-0.5 font-mono text-xs">
                   {reimbursementType === "BUNDLE" ? (
-                    bundle ? (
+                    record.distribution_mode === "MANY_MANY" ? (
+                      <span className="inline-flex items-center gap-1.5 text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-1 rounded-md">
+                        <Layers className="h-3.5 w-3.5" />
+                        Multi-Bundle (Defined per subscriber in input file)
+                      </span>
+                    ) : bundle ? (
                       <BundleDisplay
                         name={bundle?.name}
                         offerId={bundle?.offer_id}
@@ -1344,245 +1358,155 @@ export default function ReimbursementDetailsPage() {
                 )}
               </div>
 
+              {/* Conditionally render FileZone when currently editing */}
               {isEditing ? (
                 <div className="space-y-3 animate-in fade-in duration-200">
                   {renderFileZone()}
                 </div>
               ) : (
-                <div className="bg-slate-50 border border-slate-100 rounded-xl py-3 text-center text-slate-400 text-xs font-bold font-mono flex items-center justify-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                  SUBSCRIBER DATA LOCKED • EDIT WORKSPACE TO STAGE DATA
-                  REPLACEMENTS
-                </div>
+                /* Show lock banner ONLY when the reimbursement is still editable */
+                !terminalState &&
+                canModify &&
+                record.status === "pending" && (
+                  <div className="bg-slate-50 border border-slate-100 rounded-xl py-3 text-center text-slate-400 text-xs font-bold font-mono flex items-center justify-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    SUBSCRIBER DATA LOCKED • EDIT WORKSPACE TO STAGE DATA
+                    REPLACEMENTS
+                  </div>
+                )
               )}
             </div>
           )}
 
-          {/* Provisioning Execution Details Module */}
+          {/* Provisioning Execution Summary Card */}
           {provExec && (
-            <div className="bg-slate-50/70 rounded-2xl border border-slate-200 p-6 space-y-6 shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-                <h2 className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-800">
-                  <Cpu className="h-4 w-4 text-indigo-600" /> Provisioning
-                  Execution Details
-                </h2>
-                <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-200/80 text-slate-600 uppercase tracking-wide">
-                  Read-Only System Record
-                </span>
-              </div>
-
-              <div className="bg-white rounded-xl border border-slate-200/80 p-5 space-y-6 shadow-sm">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pb-4 border-b border-slate-100 text-xs">
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm flex flex-col gap-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100">
+                    <Activity className="h-4 w-4" />
+                  </div>
                   <div>
-                    <span className="text-slate-400 font-bold uppercase text-[10px] block mb-1">
-                      Execution ID
-                    </span>
-                    <p className="font-mono font-bold text-slate-800">
-                      #{provExec.id}
+                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                      Provisioning Execution Summary
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      Real-time execution stats and administrative logs
                     </p>
-                  </div>
-
-                  <div>
-                    <span className="text-slate-400 font-bold uppercase text-[10px] block mb-1">
-                      Execution Type
-                    </span>
-                    <span className="inline-flex items-center gap-1 font-bold text-slate-800">
-                      {provExec.execution_type === "COMMAND" ? (
-                        <Terminal className="h-3.5 w-3.5 text-indigo-500" />
-                      ) : (
-                        <Layers className="h-3.5 w-3.5 text-purple-500" />
-                      )}
-                      {provExec.execution_type}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="text-slate-400 font-bold uppercase text-[10px] block mb-1">
-                      Execution Status
-                    </span>
-                    <span
-                      className={cn(
-                        "font-extrabold uppercase px-2.5 py-1 rounded text-[11px] tracking-wider border shadow-sm inline-block",
-                        provExec.status?.toLowerCase() === "failed"
-                          ? "bg-rose-100 text-rose-800 border-rose-300"
-                          : provExec.status?.toLowerCase() === "success" ||
-                              provExec.status?.toLowerCase() === "provisioned"
-                            ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-                            : "bg-slate-100 text-slate-800 border-slate-300",
-                      )}
-                    >
-                      {provExec.status}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="text-slate-400 font-bold uppercase text-[10px] block mb-1">
-                      Timestamps
-                    </span>
-                    <p className="text-[11px] text-slate-600">
-                      <span className="font-semibold">Started:</span>{" "}
-                      {provExec.started_at
-                        ? new Date(provExec.started_at).toLocaleString()
-                        : "N/A"}
-                    </p>
-                    {provExec.completed_at && (
-                      <p className="text-[11px] text-slate-600">
-                        <span className="font-semibold">Completed:</span>{" "}
-                        {new Date(provExec.completed_at).toLocaleString()}
-                      </p>
-                    )}
                   </div>
                 </div>
 
-                {provExec.metrics && (
-                  <div className="space-y-3">
-                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                      Execution Metrics
-                    </h3>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono font-bold px-2.5 py-1 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg">
+                    {provExec.execution_type} EXECUTION
+                  </span>
+                  <span
+                    className={cn(
+                      "text-[10px] font-extrabold px-2.5 py-1 rounded-lg border uppercase flex items-center gap-1.5",
+                      provExec.status === "SUCCESS"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : provExec.status === "FAILED"
+                          ? "bg-rose-50 text-rose-700 border-rose-200"
+                          : "bg-amber-50 text-amber-700 border-amber-200",
+                    )}
+                  >
+                    {provExec.status === "SUCCESS" && (
+                      <CheckCircle className="h-3 w-3 text-emerald-600" />
+                    )}
+                    {provExec.status === "FAILED" && (
+                      <XCircleIcon className="h-3 w-3 text-rose-600" />
+                    )}
+                    {provExec.status}
+                  </span>
+                </div>
+              </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs">
-                      <div>
-                        <span className="text-slate-400 font-medium text-[10px] uppercase">
-                          Total Records
-                        </span>
-                        <p className="text-base font-extrabold text-slate-800">
-                          {provExec.metrics.total_records ?? 0}
-                        </p>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 font-medium text-[10px] uppercase">
-                          Processed Count
-                        </span>
-                        <p className="text-base font-extrabold text-slate-800">
-                          {provExec.metrics.processed_count ?? 0}
-                        </p>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 font-medium text-[10px] uppercase">
-                          Success Count
-                        </span>
-                        <p className="text-base font-extrabold text-emerald-600">
-                          {provExec.metrics.success_count ?? 0}
-                        </p>
-                      </div>
-                      <div
-                        className={cn(
-                          "p-2 rounded-lg transition-colors",
-                          (provExec.metrics.failure_count ?? 0) > 0
-                            ? "bg-rose-50 border border-rose-200"
-                            : "",
-                        )}
-                      >
-                        <span className="text-slate-400 font-medium text-[10px] uppercase">
-                          Failure Count
-                        </span>
-                        <p className="text-base font-extrabold text-rose-600">
-                          {provExec.metrics.failure_count ?? 0}
-                        </p>
-                      </div>
-                    </div>
+              {/* Stat Counters Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-3 flex flex-col gap-1">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                    Total Input
+                  </span>
+                  <span className="text-lg font-black text-slate-900 font-mono">
+                    {provExec.total_input ?? 0}
+                  </span>
+                </div>
+                <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3 flex flex-col gap-1">
+                  <span className="text-[9px] font-bold text-blue-500 uppercase tracking-wider">
+                    Total Processed
+                  </span>
+                  <span className="text-lg font-black text-blue-700 font-mono">
+                    {provExec.total_processed ?? 0}
+                  </span>
+                </div>
+                <div className="bg-emerald-50/40 border border-emerald-100 rounded-xl p-3 flex flex-col gap-1">
+                  <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider">
+                    Successful
+                  </span>
+                  <span className="text-lg font-black text-emerald-700 font-mono">
+                    {provExec.total_success ?? 0}
+                  </span>
+                </div>
+                <div className="bg-rose-50/40 border border-rose-100 rounded-xl p-3 flex flex-col gap-1">
+                  <span className="text-[9px] font-bold text-rose-500 uppercase tracking-wider">
+                    Failed
+                  </span>
+                  <span className="text-lg font-black text-rose-700 font-mono">
+                    {provExec.total_failed ?? 0}
+                  </span>
+                </div>
+              </div>
 
-                    {provExec.execution_type === "BATCH" &&
-                      provExec.metrics.progress_pct !== undefined && (
-                        <div className="space-y-1 pt-1">
-                          <div className="flex justify-between text-[11px] font-semibold text-slate-500">
-                            <span>Batch Execution Progress</span>
-                            <span>{provExec.metrics.progress_pct}%</span>
-                          </div>
-                          <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                            <div
-                              className="bg-indigo-600 h-2 transition-all duration-300"
-                              style={{
-                                width: `${provExec.metrics.progress_pct}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      )}
-                  </div>
+              {/* Action Buttons - Right-aligned with Permission Guards */}
+              <div className="flex flex-wrap items-center justify-end gap-2.5 pt-1 border-t border-slate-100">
+                <button
+                  type="button"
+                  disabled={isDownloadingReport}
+                  onClick={handleDownloadProvisioningReport}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition-all shadow-sm disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {isDownloadingReport ? "Downloading..." : "Download Report"}
+                </button>
+
+                {/* View Command Log - Only visible if user has command log permissions */}
+                {(userPermissions.includes(PERM.VIEW_OWN_COMMAND_LOGS) ||
+                  userPermissions.includes(PERM.VIEW_ALL_COMMAND_LOGS)) && (
+                  <button
+                    type="button"
+                    disabled={!provExec.admin_reference?.command_log_id}
+                    onClick={() => {
+                      if (provExec.admin_reference?.command_log_id) {
+                        navigate(
+                          `/commands-logs/${provExec.admin_reference.command_log_id}`,
+                        );
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 text-slate-700 transition-all border border-slate-200 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Terminal className="h-3.5 w-3.5 text-slate-500" />
+                    View Command Log
+                  </button>
                 )}
 
-                {provExec.reports && (
-                  <div className="space-y-3 pt-2 border-t border-slate-100">
-                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                      Execution Reports
-                    </h3>
-
-                    <div className="flex flex-wrap gap-3">
-                      {provExec.reports.summary_url && (
-                        <a
-                          href={provExec.reports.summary_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors border border-slate-200"
-                        >
-                          <FileText className="h-3.5 w-3.5 text-slate-500" />{" "}
-                          Summary Report
-                        </a>
-                      )}
-
-                      {provExec.reports.errors_csv && (
-                        <a
-                          href={provExec.reports.errors_csv}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors border border-rose-200"
-                        >
-                          <Download className="h-3.5 w-3.5 text-rose-500" />{" "}
-                          Download Failure Logs (.CSV)
-                        </a>
-                      )}
-
-                      {provExec.reports.full_report && (
-                        <a
-                          href={provExec.reports.full_report}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors border border-indigo-200"
-                        >
-                          <Download className="h-3.5 w-3.5 text-indigo-500" />{" "}
-                          Full Execution Report
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {provExec.errors && provExec.errors.length > 0 && (
-                  <div className="space-y-3 pt-2 border-t border-slate-100">
-                    <h3 className="text-xs font-bold text-rose-600 flex items-center gap-1 uppercase tracking-wider">
-                      <AlertTriangle className="h-3.5 w-3.5" /> Execution
-                      Failure Details
-                    </h3>
-
-                    <div className="border border-rose-200 rounded-xl overflow-hidden bg-rose-50/50 text-xs">
-                      <table className="w-full text-left">
-                        <thead className="bg-rose-100/60 text-rose-800 font-bold border-b border-rose-200">
-                          <tr>
-                            <th className="p-2.5">Row</th>
-                            <th className="p-2.5">Identifier</th>
-                            <th className="p-2.5">Error Reason</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-rose-100 text-slate-700">
-                          {provExec.errors.map((errItem, idx) => (
-                            <tr key={idx}>
-                              <td className="p-2.5 font-mono text-slate-500">
-                                {errItem.row ?? idx + 1}
-                              </td>
-                              <td className="p-2.5 font-mono font-semibold">
-                                {errItem.identifier ?? "N/A"}
-                              </td>
-                              <td className="p-2.5 font-medium text-rose-700">
-                                {errItem.reason ||
-                                  "Unspecified execution failure"}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                {/* View Batch Job - Only visible if user has batch job permissions */}
+                {(userPermissions.includes(PERM.VIEW_OWN_BATCH_INSTANCES) ||
+                  userPermissions.includes(PERM.VIEW_ALL_BATCH_INSTANCES)) && (
+                  <button
+                    type="button"
+                    disabled={!provExec.admin_reference?.batch_job_id}
+                    onClick={() => {
+                      if (provExec.admin_reference?.batch_job_id) {
+                        navigate(
+                          `/batch-jobs/${provExec.admin_reference.batch_job_id}`,
+                        );
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 text-slate-700 transition-all border border-slate-200 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <LayersIcon className="h-3.5 w-3.5 text-slate-500" />
+                    View Batch Job
+                  </button>
                 )}
               </div>
             </div>

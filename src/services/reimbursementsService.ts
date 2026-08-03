@@ -65,6 +65,7 @@ export interface ReimbursementStats {
     success: number;
     rejected: number;
     failed: number;
+    cancelled: number;
   };
   performance: {
     success_rate: number;
@@ -231,7 +232,7 @@ export const reimbursementsService = {
     id: string,
   ): Promise<{ success: boolean; message?: string }> => {
     // Utilizing your project's configured API instance
-    const response = await api.post(`/reimbursements/${id}/cancel`);
+    const response = await api.post(`/operations/reimbursements/${id}/cancel`);
     return response.data;
   },
 
@@ -463,5 +464,23 @@ export const reimbursementsService = {
     const response = await api.get("/operations/catalog/bundle-categories");
 
     return response.data;
+  },
+
+  async downloadProvisioningReport(id: string): Promise<void> {
+    const response = await api.get(
+      `/operations/reimbursements/${id}/download-provisioning-report`,
+      {
+        responseType: "blob",
+      },
+    );
+
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `provisioning-report-${id}.xlsx`); // Adjust file extension if needed
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
   },
 };

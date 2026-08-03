@@ -81,7 +81,14 @@ export default function ReimbursementsPage() {
 
   const [stats, setStats] = useState({
     total: 0,
-    by_status: { pending: 0, approved: 0, success: 0, rejected: 0, failed: 0 },
+    by_status: {
+      pending: 0,
+      approved: 0,
+      success: 0,
+      rejected: 0,
+      failed: 0,
+      cancelled: 0,
+    },
     performance: { success_rate: 0 },
   });
 
@@ -207,8 +214,9 @@ export default function ReimbursementsPage() {
           >
             <option value="">All Statuses</option>
             <optgroup label="Workflow Status">
-              <option value="pending">Pending Approval</option>
+              <option value="pending">Pending Review</option>
               <option value="rejected">Rejected</option>
+              <option value="cancelled">Cancelled</option>
             </optgroup>
             <optgroup label="Approval & Fulfillment">
               <option value="approved">Approved (All)</option>
@@ -365,7 +373,7 @@ export default function ReimbursementsPage() {
         accessor: (item: any) => (
           <div className="flex flex-col">
             <span className="text-xs font-bold text-slate-700">
-              {item.msisdn}
+              {item.msisdn || "Batch Distribution"}
             </span>
             <span className="text-[10px] text-slate-400 font-mono">
               {item.is_bulk ? "Batch File Processing" : "Single Account Input"}
@@ -375,28 +383,42 @@ export default function ReimbursementsPage() {
       },
       {
         header: "Bundle / Airtime",
-        accessor: (item: any) => (
-          <div className="space-y-1.5">
-            <span className="block text-xs font-medium text-slate-600">
-              {item.bundle ? item.bundle.name : `${item.amount} Airtime`}
-            </span>
-            <span
-              className={cn(
-                "inline-flex items-center gap-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border",
-                item.reimbursement_mode === "AUTO"
-                  ? "bg-purple-50 text-purple-600 border-purple-100"
-                  : "bg-orange-50 text-orange-600 border-orange-100",
-              )}
-            >
-              {item.reimbursement_mode === "AUTO" ? (
-                <Cpu className="h-2.5 w-2.5" />
-              ) : (
-                <User className="h-2.5 w-2.5" />
-              )}
-              {item.reimbursement_mode || "AUTO"}
-            </span>
-          </div>
-        ),
+        accessor: (item: any) => {
+          // Resolve item description depending on distribution mode & product configuration
+          let displayItemName = "";
+          if (item.distribution_mode === "MANY_MANY") {
+            displayItemName = "Dynamic Batch Packages";
+          } else if (item.bundle?.name) {
+            displayItemName = item.bundle.name;
+          } else if (item.amount !== undefined && item.amount !== null) {
+            displayItemName = `${item.amount} Airtime`;
+          } else {
+            displayItemName = "Multiple Target Products";
+          }
+
+          return (
+            <div className="space-y-1.5">
+              <span className="block text-xs font-medium text-slate-600">
+                {displayItemName}
+              </span>
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border",
+                  item.reimbursement_mode === "AUTO"
+                    ? "bg-purple-50 text-purple-600 border-purple-100"
+                    : "bg-orange-50 text-orange-600 border-orange-100",
+                )}
+              >
+                {item.reimbursement_mode === "AUTO" ? (
+                  <Cpu className="h-2.5 w-2.5" />
+                ) : (
+                  <User className="h-2.5 w-2.5" />
+                )}
+                {item.reimbursement_mode || "AUTO"}
+              </span>
+            </div>
+          );
+        },
       },
       {
         header: "Status & Execution",
@@ -405,7 +427,7 @@ export default function ReimbursementsPage() {
             pending: "bg-blue-50 text-blue-700 border-blue-200",
             approved: "bg-emerald-50 text-emerald-700 border-emerald-200",
             rejected: "bg-rose-50 text-rose-700 border-rose-200",
-            cancelled: "bg-slate-50 text-slate-600 border-slate-200",
+            cancelled: "bg-slate-50 text-slate-700 border-slate-200",
           };
 
           const provisioningVariants: Record<
@@ -439,24 +461,26 @@ export default function ReimbursementsPage() {
 
           return (
             <div className="flex flex-col items-start gap-1">
-              <span
-                className={cn(
-                  "inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider",
-                  approvalVariants[item.status] || "bg-slate-50 text-slate-600",
-                )}
-              >
-                {item.status}
-              </span>
-
-              {item.status === "approved" && provInfo && (
+              {/* If item is approved and has a execution/provisioning state, display the provisioning badge instead of redundant APPROVED badge */}
+              {item.status === "approved" && provInfo ? (
                 <span
                   className={cn(
-                    "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] border",
+                    "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] border font-bold uppercase tracking-wider",
                     provInfo.style,
                   )}
                 >
                   <Cpu className="h-2.5 w-2.5" />
                   {provInfo.label}
+                </span>
+              ) : (
+                <span
+                  className={cn(
+                    "inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider",
+                    approvalVariants[item.status] ||
+                      "bg-slate-50 text-slate-600",
+                  )}
+                >
+                  {item.status}
                 </span>
               )}
 
