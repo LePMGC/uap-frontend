@@ -1,9 +1,12 @@
+// src/components/layout/Header.tsx
 import { Search, Bell, Settings, RefreshCw } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { providerInstanceService } from "@/services/providerInstanceService";
+import { useTranslation } from "react-i18next";
 
 export function Header() {
+  const { t } = useTranslation();
   const [instances, setInstances] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastSync, setLastSync] = useState(new Date().toLocaleTimeString());
@@ -35,7 +38,7 @@ export function Header() {
       <div className="relative w-80 min-w-[200px] flex-shrink-0">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
         <input
-          placeholder="Search MSISDN, Batch, Command..."
+          placeholder={t("header.searchPlaceholder")}
           className="w-full h-10 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
         />
         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-300 border border-slate-200 px-1.5 py-0.5 rounded uppercase">
@@ -43,7 +46,7 @@ export function Header() {
         </div>
       </div>
 
-      {/* 📊 System Info (merged) */}
+      {/* 📊 System Info */}
       <div className="flex items-center gap-6 flex-1 min-w-0 text-xs">
         {/* Providers */}
         <div className="flex items-center gap-5 overflow-hidden">
@@ -73,27 +76,30 @@ export function Header() {
                       isOnline ? "text-green-600" : "text-red-600",
                     )}
                   >
-                    {isOnline ? "Connected" : "Offline"}
+                    {isOnline ? t("header.connected") : t("header.offline")}
                   </span>
                 </div>
               );
             })
           ) : (
-            <span className="italic text-slate-300">No providers</span>
+            <span className="italic text-slate-300">
+              {t("header.noProviders")}
+            </span>
           )}
         </div>
 
         {/* Last Sync + Refresh */}
         <div className="flex items-center gap-2 whitespace-nowrap text-slate-400 ml-auto">
           <span className="tabular-nums">
-            Last sync: <span className="text-slate-600">{lastSync}</span>
+            {t("header.lastSync")}{" "}
+            <span className="text-slate-600">{lastSync}</span>
           </span>
 
           <button
             onClick={fetchStatus}
             disabled={loading}
             className="p-1 hover:bg-slate-100 rounded transition"
-            title="Refresh"
+            title={t("header.refreshTitle")}
           >
             <RefreshCw
               className={cn(
@@ -110,7 +116,7 @@ export function Header() {
         <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-green-50 text-green-700 rounded-full border border-green-100">
           <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
           <span className="text-[11px] font-bold uppercase whitespace-nowrap">
-            System Operational
+            {t("header.systemOperational")}
           </span>
         </div>
 

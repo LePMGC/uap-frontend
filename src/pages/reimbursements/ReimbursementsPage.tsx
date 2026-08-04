@@ -13,6 +13,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { GenericDataTable } from "@/components/ui/GenericDataTable";
 import { useToastStore } from "@/hooks/useToastStore";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ import {
 } from "@/services/reimbursementsService";
 
 export default function ReimbursementsPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { showToast } = useToastStore();
 
@@ -151,7 +153,7 @@ export default function ReimbursementsPage() {
         setStats(statsRes.data);
       }
     } catch (error) {
-      showToast("Failed to load reimbursements", "error");
+      showToast(t("reimbursements.list.toasts.loadError"), "error");
     } finally {
       setLoading(false);
     }
@@ -170,6 +172,7 @@ export default function ReimbursementsPage() {
     createdAtStart,
     createdAtEnd,
     showToast,
+    t,
   ]);
 
   useEffect(() => {
@@ -212,17 +215,33 @@ export default function ReimbursementsPage() {
             }}
             className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 h-9"
           >
-            <option value="">All Statuses</option>
-            <optgroup label="Workflow Status">
-              <option value="pending">Pending Review</option>
-              <option value="rejected">Rejected</option>
-              <option value="cancelled">Cancelled</option>
+            <option value="">
+              {t("reimbursements.list.filters.allStatuses")}
+            </option>
+            <optgroup label={t("reimbursements.list.filters.groupWorkflow")}>
+              <option value="pending">
+                {t("reimbursements.list.status.pending")}
+              </option>
+              <option value="rejected">
+                {t("reimbursements.list.status.rejected")}
+              </option>
+              <option value="cancelled">
+                {t("reimbursements.list.status.cancelled")}
+              </option>
             </optgroup>
-            <optgroup label="Approval & Fulfillment">
-              <option value="approved">Approved (All)</option>
-              <option value="queued">Approved & Provisioning Queued</option>
-              <option value="success">Approved & Fulfilled (Success)</option>
-              <option value="failed">Approved & Provisioning Failed</option>
+            <optgroup label={t("reimbursements.list.filters.groupApproval")}>
+              <option value="approved">
+                {t("reimbursements.list.status.approvedAll")}
+              </option>
+              <option value="queued">
+                {t("reimbursements.list.status.queued")}
+              </option>
+              <option value="success">
+                {t("reimbursements.list.status.success")}
+              </option>
+              <option value="failed">
+                {t("reimbursements.list.status.failed")}
+              </option>
             </optgroup>
           </select>
         ),
@@ -238,9 +257,15 @@ export default function ReimbursementsPage() {
             }}
             className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 h-9"
           >
-            <option value="">All Resource Types</option>
-            <option value="AIRTIME">Airtime Topups</option>
-            <option value="BUNDLE">Data/Bundle Packages</option>
+            <option value="">
+              {t("reimbursements.list.filters.allResourceTypes")}
+            </option>
+            <option value="AIRTIME">
+              {t("reimbursements.list.filters.airtimeTopups")}
+            </option>
+            <option value="BUNDLE">
+              {t("reimbursements.list.filters.dataPackages")}
+            </option>
           </select>
         ),
       },
@@ -255,7 +280,9 @@ export default function ReimbursementsPage() {
             }}
             className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 h-9"
           >
-            <option value="">All Requesters</option>
+            <option value="">
+              {t("reimbursements.list.filters.allRequesters")}
+            </option>
             {requesters.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name}
@@ -275,7 +302,9 @@ export default function ReimbursementsPage() {
             }}
             className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 h-9"
           >
-            <option value="">All Reviewers</option>
+            <option value="">
+              {t("reimbursements.list.filters.allReviewers")}
+            </option>
             {reviewers.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name}
@@ -295,9 +324,15 @@ export default function ReimbursementsPage() {
             }}
             className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] font-bold text-slate-600 h-9"
           >
-            <option value="">All Execution Modes</option>
-            <option value="AUTO">Automated (AUTO)</option>
-            <option value="MANUAL">Manual Processing</option>
+            <option value="">
+              {t("reimbursements.list.filters.allExecutionModes")}
+            </option>
+            <option value="AUTO">
+              {t("reimbursements.list.filters.automated")}
+            </option>
+            <option value="MANUAL">
+              {t("reimbursements.list.filters.manualProcessing")}
+            </option>
           </select>
         ),
       },
@@ -315,7 +350,9 @@ export default function ReimbursementsPage() {
               }}
               className="bg-transparent text-[11px] outline-none"
             />
-            <span className="text-[10px]">to</span>
+            <span className="text-[10px]">
+              {t("reimbursements.list.filters.dateTo")}
+            </span>
             <input
               type="date"
               value={createdAtEnd}
@@ -339,6 +376,7 @@ export default function ReimbursementsPage() {
       createdAtEnd,
       requesters,
       reviewers,
+      t,
     ],
   );
 
@@ -346,7 +384,7 @@ export default function ReimbursementsPage() {
   const columns = useMemo(
     () => [
       {
-        header: "Ticket Context",
+        header: t("reimbursements.list.columns.ticketContext"),
         accessor: (item: any) => (
           <div className="flex items-center gap-3">
             <div className="p-2 bg-indigo-50 rounded-lg border border-indigo-100 text-indigo-600">
@@ -369,31 +407,34 @@ export default function ReimbursementsPage() {
         ),
       },
       {
-        header: "Target Subscriber",
+        header: t("reimbursements.list.columns.targetSubscriber"),
         accessor: (item: any) => (
           <div className="flex flex-col">
             <span className="text-xs font-bold text-slate-700">
-              {item.msisdn || "Batch Distribution"}
+              {item.msisdn || t("reimbursements.list.batchDistribution")}
             </span>
             <span className="text-[10px] text-slate-400 font-mono">
-              {item.is_bulk ? "Batch File Processing" : "Single Account Input"}
+              {item.is_bulk
+                ? t("reimbursements.list.batchFileProcessing")
+                : t("reimbursements.list.singleAccountInput")}
             </span>
           </div>
         ),
       },
       {
-        header: "Bundle / Airtime",
+        header: t("reimbursements.list.columns.bundleAirtime"),
         accessor: (item: any) => {
-          // Resolve item description depending on distribution mode & product configuration
           let displayItemName = "";
           if (item.distribution_mode === "MANY_MANY") {
-            displayItemName = "Dynamic Batch Packages";
+            displayItemName = t("reimbursements.list.dynamicBatchPackages");
           } else if (item.bundle?.name) {
             displayItemName = item.bundle.name;
           } else if (item.amount !== undefined && item.amount !== null) {
-            displayItemName = `${item.amount} Airtime`;
+            displayItemName = t("reimbursements.list.airtimeAmount", {
+              amount: item.amount,
+            });
           } else {
-            displayItemName = "Multiple Target Products";
+            displayItemName = t("reimbursements.list.multipleTargetProducts");
           }
 
           return (
@@ -421,7 +462,7 @@ export default function ReimbursementsPage() {
         },
       },
       {
-        header: "Status & Execution",
+        header: t("reimbursements.list.columns.statusExecution"),
         accessor: (item: any) => {
           const approvalVariants: Record<string, string> = {
             pending: "bg-blue-50 text-blue-700 border-blue-200",
@@ -435,22 +476,22 @@ export default function ReimbursementsPage() {
             { label: string; style: string }
           > = {
             SUCCESS: {
-              label: "Fulfilled",
+              label: t("reimbursements.list.provStatus.fulfilled"),
               style:
                 "bg-emerald-100 text-emerald-800 border-emerald-300 font-semibold",
             },
             FAILED: {
-              label: "Provisioning Failed",
+              label: t("reimbursements.list.provStatus.failed"),
               style:
                 "bg-amber-100 text-amber-800 border-amber-300 font-semibold",
             },
             IN_PROGRESS: {
-              label: "Provisioning...",
+              label: t("reimbursements.list.provStatus.inProgress"),
               style:
                 "bg-purple-50 text-purple-700 border-purple-200 animate-pulse",
             },
             PENDING: {
-              label: "Queued",
+              label: t("reimbursements.list.provStatus.queued"),
               style: "bg-slate-100 text-slate-700 border-slate-200",
             },
           };
@@ -461,7 +502,6 @@ export default function ReimbursementsPage() {
 
           return (
             <div className="flex flex-col items-start gap-1">
-              {/* If item is approved and has a execution/provisioning state, display the provisioning badge instead of redundant APPROVED badge */}
               {item.status === "approved" && provInfo ? (
                 <span
                   className={cn(
@@ -480,13 +520,17 @@ export default function ReimbursementsPage() {
                       "bg-slate-50 text-slate-600",
                   )}
                 >
-                  {item.status}
+                  {t(`reimbursements.list.status.${item.status}`, {
+                    defaultValue: item.status,
+                  })}
                 </span>
               )}
 
               {item.status === "rejected" && item.rejection_reason && (
                 <span className="text-[10px] text-rose-600 font-medium max-w-[180px] truncate">
-                  Reason: {item.rejection_reason}
+                  {t("reimbursements.list.reasonLabel", {
+                    reason: item.rejection_reason,
+                  })}
                 </span>
               )}
             </div>
@@ -494,7 +538,7 @@ export default function ReimbursementsPage() {
         },
       },
       {
-        header: "Creation Date",
+        header: t("reimbursements.list.columns.creationDate"),
         accessor: (item: any) => (
           <span className="text-xs text-slate-600 font-medium">
             {item.created_at
@@ -509,7 +553,7 @@ export default function ReimbursementsPage() {
         ),
       },
       {
-        header: "Requested By",
+        header: t("reimbursements.list.columns.requestedBy"),
         accessor: (item: any) => (
           <span className="text-xs text-slate-600 font-medium">
             {item.requester_name || "---"}
@@ -517,25 +561,24 @@ export default function ReimbursementsPage() {
         ),
       },
     ],
-    [],
+    [t],
   );
 
   const actions = useMemo(
     () => [
       {
-        label: "View Request Details",
+        label: t("reimbursements.list.actions.viewDetails"),
         icon: <Eye className="h-3.5 w-3.5" />,
         onClick: (item: any) => navigate(`/reimbursements/${item.id}`),
       },
     ],
-    [navigate],
+    [navigate, t],
   );
 
   if (!canViewAll && !canViewOwn) {
     return (
       <div className="p-8 text-center text-slate-500 font-medium">
-        Access Denied: Insufficient application privileges to view reimbursement
-        operations.
+        {t("reimbursements.list.accessDenied")}
       </div>
     );
   }
@@ -546,42 +589,42 @@ export default function ReimbursementsPage() {
       <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
         {[
           {
-            label: "Total Requests",
+            label: t("reimbursements.list.stats.totalRequests"),
             value: stats.total,
             icon: Layers,
             color: "text-slate-600",
             bg: "bg-slate-50",
           },
           {
-            label: "Provisioned (Success)",
+            label: t("reimbursements.list.stats.provisionedSuccess"),
             value: stats.by_status?.success || 0,
             icon: CheckCircle2,
             color: "text-emerald-600",
             bg: "bg-emerald-50",
           },
           {
-            label: "Pending Review",
+            label: t("reimbursements.list.stats.pendingReview"),
             value: stats.by_status?.pending || 0,
             icon: Clock,
             color: "text-blue-600",
             bg: "bg-blue-50",
           },
           {
-            label: "Rejected By Ops",
+            label: t("reimbursements.list.stats.rejectedByOps"),
             value: stats.by_status?.rejected || 0,
             icon: Ban,
             color: "text-rose-600",
             bg: "bg-rose-50",
           },
           {
-            label: "System Failures",
+            label: t("reimbursements.list.stats.systemFailures"),
             value: stats.by_status?.failed || 0,
             icon: XCircle,
             color: "text-amber-600",
             bg: "bg-amber-50",
           },
           {
-            label: "Fulfillment Rate",
+            label: t("reimbursements.list.stats.fulfillmentRate"),
             value: `${stats.performance?.success_rate || 0}%`,
             icon: Activity,
             color: "text-indigo-600",
@@ -606,13 +649,13 @@ export default function ReimbursementsPage() {
       </div>
 
       <GenericDataTable
-        title="Reimbursements"
+        title={t("reimbursements.list.title")}
         data={data}
         columns={columns}
         actions={actions}
         filters={tableFilters}
         pagination={pagination}
-        searchPlaceholder="Search by Ticket ID or MSISDN..."
+        searchPlaceholder={t("reimbursements.list.searchPlaceholder")}
         searchWidth="w-full md:w-64"
         onSearchChange={(val) => {
           setSearchQuery(val);

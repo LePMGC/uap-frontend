@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   ArrowLeft,
   Ticket,
@@ -115,6 +116,7 @@ interface ReimbursementItem extends Omit<
 }
 
 export default function ReimbursementDetailsPage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { showToast } = useToastStore();
@@ -253,7 +255,7 @@ export default function ReimbursementDetailsPage() {
           setSelectedCategory(officialCategories[0]);
         }
       } catch (err) {
-        showToast("Unable to load reimbursement catalog.", "error");
+        showToast(t("reimbursements.create.toasts.catalogLoadError"), "error");
       }
     }
 
@@ -261,7 +263,7 @@ export default function ReimbursementDetailsPage() {
     return () => {
       isMounted = false;
     };
-  }, [showToast]);
+  }, [showToast, selectedCategory, t]);
 
   const filteredBundles = useMemo(() => {
     return bundles.filter(
@@ -275,7 +277,7 @@ export default function ReimbursementDetailsPage() {
 
   const selectedBundleName = useMemo(() => {
     const found = bundles.find((b) => String(b.id) === String(targetProductId));
-    if (!found) return "Choose explicit product schema...";
+    if (!found) return t("reimbursements.details.chooseSchema");
 
     return (
       <span className="flex items-center gap-3 text-xs truncate">
@@ -286,7 +288,7 @@ export default function ReimbursementDetailsPage() {
         <span className="font-semibold text-indigo-600">{found.price}</span>
       </span>
     );
-  }, [bundles, targetProductId]);
+  }, [bundles, targetProductId, t]);
 
   useEffect(() => {
     if (record?.target_product_id && bundles.length > 0) {
@@ -349,12 +351,12 @@ export default function ReimbursementDetailsPage() {
         },
       );
     } catch (err) {
-      showToast("Failed to retrieve structural details.", "error");
+      showToast(t("reimbursements.create.toasts.submitError"), "error");
       navigate("/reimbursements");
     } finally {
       setLoading(false);
     }
-  }, [id, navigate, showToast]);
+  }, [id, navigate, showToast, t]);
 
   useEffect(() => {
     fetchDetails();
@@ -368,11 +370,11 @@ export default function ReimbursementDetailsPage() {
     try {
       setIsActioning(true);
       await reimbursementsService.approveReimbursement(id);
-      showToast("Reimbursement transaction approved successfully.", "success");
+      showToast(t("reimbursements.details.toasts.approveSuccess"), "success");
       setIsApproveModalOpen(false);
       await fetchDetails();
     } catch (error) {
-      showToast("An error occurred during approval layout updates.", "error");
+      showToast(t("reimbursements.details.toasts.approveError"), "error");
     } finally {
       setIsActioning(false);
     }
@@ -388,12 +390,12 @@ export default function ReimbursementDetailsPage() {
         id,
         rejectionReason.trim(),
       );
-      showToast("Reimbursement marked as rejected.", "success");
+      showToast(t("reimbursements.details.toasts.rejectSuccess"), "success");
       setIsRejectModalOpen(false);
       setRejectionReason("");
       await fetchDetails();
     } catch (error) {
-      showToast("Failed to update rejection logs.", "error");
+      showToast(t("reimbursements.details.toasts.rejectError"), "error");
     } finally {
       setIsActioning(false);
     }
@@ -406,11 +408,11 @@ export default function ReimbursementDetailsPage() {
     try {
       setIsActioning(true);
       await reimbursementsService.cancelReimbursement(id);
-      showToast("Reimbursement request has been cancelled.", "success");
+      showToast(t("reimbursements.details.toasts.cancelSuccess"), "success");
       setIsCancelModalOpen(false);
       await fetchDetails();
     } catch (error) {
-      showToast("Failed to cancel pending request ledger entry.", "error");
+      showToast(t("reimbursements.details.toasts.cancelError"), "error");
     } finally {
       setIsActioning(false);
     }
@@ -421,12 +423,9 @@ export default function ReimbursementDetailsPage() {
     try {
       setIsDownloadingInput(true);
       await reimbursementsService.downloadInputFile(id);
-      showToast("Input spreadsheet downloaded successfully.", "success");
+      showToast(t("reimbursements.details.toasts.inputSuccess"), "success");
     } catch (error) {
-      showToast(
-        "Session file fetch unauthorized or missing on storage.",
-        "error",
-      );
+      showToast(t("reimbursements.details.toasts.inputError"), "error");
     } finally {
       setIsDownloadingInput(false);
     }
@@ -438,11 +437,11 @@ export default function ReimbursementDetailsPage() {
       setIsDownloading(true);
       await reimbursementsService.downloadCurrentSubscribers(id, format);
       showToast(
-        "Current subscriber template exported successfully.",
+        t("reimbursements.details.toasts.subscribersSuccess"),
         "success",
       );
     } catch (error) {
-      showToast("Failed to generate download template format stream.", "error");
+      showToast(t("reimbursements.details.toasts.subscribersError"), "error");
     } finally {
       setIsDownloading(false);
     }
@@ -469,11 +468,16 @@ export default function ReimbursementDetailsPage() {
 
         if (response.metrics.invalid > 0) {
           showToast(
-            `Replacement data contains ${response.metrics.invalid} schema violations.`,
+            t("reimbursements.details.toasts.stagedViolationError", {
+              count: response.metrics.invalid,
+            }),
             "error",
           );
         } else {
-          showToast("Replacement list staged cleanly.", "success");
+          showToast(
+            t("reimbursements.details.toasts.stagedSuccess"),
+            "success",
+          );
         }
       } else {
         throw new Error(
@@ -484,7 +488,7 @@ export default function ReimbursementDetailsPage() {
       setUploadedFile(null);
       setNewFileReferenceId(null);
       showToast(
-        err?.message || "Failed to process target matrix replacement.",
+        err?.message || t("reimbursements.create.toasts.parseFileError"),
         "error",
       );
     } finally {
@@ -513,9 +517,12 @@ export default function ReimbursementDetailsPage() {
         }
       }
       setAttachments((prev) => [...prev, ...newItems]);
-      showToast("Support vouchers uploaded successfully.", "success");
+      showToast(
+        t("reimbursements.details.toasts.attachmentSuccess"),
+        "success",
+      );
     } catch (err) {
-      showToast("Failed to upload evidence records.", "error");
+      showToast(t("reimbursements.details.toasts.attachmentError"), "error");
     } finally {
       setIsUploading(false);
       e.target.value = "";
@@ -529,20 +536,23 @@ export default function ReimbursementDetailsPage() {
   const handleSaveChanges = async () => {
     if (!id || !record) return;
     if (!ticketId.trim())
-      return showToast("Trouble Ticket reference cannot be empty.", "error");
+      return showToast(
+        t("reimbursements.details.toasts.ticketEmptyError"),
+        "error",
+      );
     if (!isBulk && !msisdn.trim())
       return showToast(
-        "MSISDN parameter is required for single transactions.",
+        t("reimbursements.details.toasts.msisdnRequiredError"),
         "error",
       );
     if (isBulk && bulkErrors.length > 0)
       return showToast(
-        "Clear validation errors before tracking update rules.",
+        t("reimbursements.details.toasts.clearValidationError"),
         "error",
       );
     if (isBulk && !newFileReferenceId && !currentFileReferenceId) {
       return showToast(
-        "A subscriber distribution file is required for bulk mode.",
+        t("reimbursements.details.toasts.fileRequiredError"),
         "error",
       );
     }
@@ -574,11 +584,11 @@ export default function ReimbursementDetailsPage() {
     try {
       setIsSaving(true);
       await reimbursementsService.updateReimbursement(id, payload);
-      showToast("Reimbursement transaction updated successfully.", "success");
+      showToast(t("reimbursements.details.toasts.updateSuccess"), "success");
       setIsEditing(false);
       await fetchDetails();
     } catch (err) {
-      showToast("Failed to commit ledger synchronization updates.", "error");
+      showToast(t("reimbursements.details.toasts.updateError"), "error");
     } finally {
       setIsSaving(false);
     }
@@ -589,9 +599,9 @@ export default function ReimbursementDetailsPage() {
     try {
       setIsDownloadingReport(true);
       await reimbursementsService.downloadProvisioningReport(id);
-      showToast("Provisioning report downloaded successfully.", "success");
+      showToast(t("reimbursements.details.toasts.reportSuccess"), "success");
     } catch (error) {
-      showToast("Failed to download provisioning report.", "error");
+      showToast(t("reimbursements.details.toasts.reportError"), "error");
     } finally {
       setIsDownloadingReport(false);
     }
@@ -606,49 +616,49 @@ export default function ReimbursementDetailsPage() {
         bg: "bg-amber-50 border-amber-200",
         text: "text-amber-700",
         icon: Clock,
-        label: "Pending Approval",
+        label: t("reimbursements.details.status.pending"),
       },
       approved: {
         bg: "bg-blue-50 border-blue-200",
         text: "text-blue-700",
         icon: CheckCircle2,
-        label: "Approved",
+        label: t("reimbursements.details.status.approved"),
       },
       provisioned: {
         bg: "bg-emerald-50 border-emerald-200",
         text: "text-emerald-700",
         icon: CheckCircle2,
-        label: "Provisioned",
+        label: t("reimbursements.details.status.provisioned"),
       },
       success: {
         bg: "bg-emerald-50 border-emerald-200",
         text: "text-emerald-700",
         icon: CheckCircle2,
-        label: "Success",
+        label: t("reimbursements.details.status.success"),
       },
       rejected: {
         bg: "bg-rose-50 border-rose-200",
         text: "text-rose-700",
         icon: XCircle,
-        label: "Rejected",
+        label: t("reimbursements.details.status.rejected"),
       },
       cancelled: {
         bg: "bg-rose-50 border-rose-200",
         text: "text-rose-700",
         icon: XCircle,
-        label: "Cancelled",
+        label: t("reimbursements.details.status.cancelled"),
       },
       canceled: {
         bg: "bg-rose-50 border-rose-200",
         text: "text-rose-700",
         icon: XCircle,
-        label: "Canceled",
+        label: t("reimbursements.details.status.canceled"),
       },
       failed: {
         bg: "bg-rose-50 border-rose-200",
         text: "text-rose-700",
         icon: AlertCircle,
-        label: "Execution Failed",
+        label: t("reimbursements.details.status.failed"),
       },
     };
     const c = config[status?.toLowerCase() || ""] || config.pending;
@@ -673,7 +683,7 @@ export default function ReimbursementDetailsPage() {
         <div className="border border-dashed border-indigo-200 bg-indigo-50/20 rounded-xl p-6 text-center flex flex-col items-center justify-center gap-2">
           <div className="h-5 w-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
           <span className="text-xs font-bold text-indigo-700">
-            Streaming and validating file structure arrays...
+            {t("reimbursements.create.streamingData")}
           </span>
         </div>
       );
@@ -704,10 +714,10 @@ export default function ReimbursementDetailsPage() {
             </div>
             <div>
               <span className="text-xs font-bold text-slate-700 block">
-                Drag & drop spreadsheet revision matrix, or browse local volumes
+                {t("reimbursements.create.dragDrop")}
               </span>
               <span className="text-[10px] text-slate-400 font-medium">
-                Limits layout specifications: Max structural allowance 10MB
+                {t("reimbursements.create.maxUploadSize")}
               </span>
             </div>
           </div>
@@ -721,8 +731,8 @@ export default function ReimbursementDetailsPage() {
             >
               <Download className="h-3 w-3" />
               {isDownloading
-                ? "Exporting..."
-                : "Export Blank Template Schema"}{" "}
+                ? t("reimbursements.details.exporting")
+                : t("reimbursements.details.exportBlankTemplate")}{" "}
               <ChevronDown className="h-2.5 w-2.5" />
             </button>
 
@@ -738,7 +748,9 @@ export default function ReimbursementDetailsPage() {
                     }}
                     className="w-full text-left px-3 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 block transition-colors"
                   >
-                    Export .{fmt.toUpperCase()} Format
+                    {t("reimbursements.details.exportFormat", {
+                      format: fmt.toUpperCase(),
+                    })}
                   </button>
                 ))}
               </div>
@@ -774,7 +786,7 @@ export default function ReimbursementDetailsPage() {
         <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-bold">
           <div className="bg-slate-50 rounded-lg p-2 border border-slate-100">
             <span className="text-[9px] font-bold text-slate-400 block uppercase">
-              Staged Record Rows
+              {t("reimbursements.create.ingestedRowItems")}
             </span>
             <span className="text-sm font-black text-slate-700">
               {bulkMetrics.total}
@@ -782,7 +794,7 @@ export default function ReimbursementDetailsPage() {
           </div>
           <div className="bg-green-50/40 rounded-lg p-2 border border-green-100">
             <span className="text-[9px] font-bold text-green-500 block uppercase">
-              Validated Elements
+              {t("reimbursements.create.validatedTargets")}
             </span>
             <span className="text-sm font-black text-green-700 flex items-center justify-center gap-0.5">
               <CheckCircle2 className="h-3 w-3 text-green-500" />{" "}
@@ -791,7 +803,7 @@ export default function ReimbursementDetailsPage() {
           </div>
           <div className="bg-red-50/40 rounded-lg p-2 border border-red-100">
             <span className="text-[9px] font-bold text-red-500 block uppercase">
-              Rejected Errors
+              {t("reimbursements.create.rejectedErrors")}
             </span>
             <span className="text-sm font-black text-red-700 flex items-center justify-center gap-0.5">
               <AlertCircle className="h-3 w-3 text-red-500" />{" "}
@@ -803,16 +815,20 @@ export default function ReimbursementDetailsPage() {
         {bulkErrors.length > 0 && (
           <div className="flex flex-col gap-1 animate-in slide-in-from-top-2 duration-200">
             <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider block">
-              Ingesting Fault Diagnostics Logs
+              {t("reimbursements.create.ingestionFaultLogs")}
             </span>
             <div className="border border-red-100 rounded-lg overflow-hidden text-[11px] bg-white max-h-40 overflow-y-auto shadow-inner">
               <table className="w-full border-collapse">
                 <thead className="sticky top-0 bg-red-50 z-10 text-red-700 font-bold text-left">
                   <tr className="border-b border-red-100">
-                    <th className="p-2 w-16">Row ID</th>
-                    <th className="p-2 w-32">Identifier</th>
+                    <th className="p-2 w-16">
+                      {t("reimbursements.create.rowId")}
+                    </th>
+                    <th className="p-2 w-32">
+                      {t("reimbursements.create.identifier")}
+                    </th>
                     <th className="p-2">
-                      Failure Reason Description Framework
+                      {t("reimbursements.create.failureReason")}
                     </th>
                   </tr>
                 </thead>
@@ -869,7 +885,7 @@ export default function ReimbursementDetailsPage() {
           </button>
           <div>
             <div className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">
-              Reimbursement Details
+              {t("reimbursements.details.pageHeader")}
             </div>
             <h1 className="text-xl font-bold tracking-tight text-slate-900">
               Ticket #{record.ticket_id || record.id}
@@ -890,7 +906,8 @@ export default function ReimbursementDetailsPage() {
                       onClick={() => setIsRejectModalOpen(true)}
                       className="h-9 px-3.5 rounded-xl border border-rose-200 bg-rose-50/50 text-rose-700 font-bold text-xs hover:bg-rose-100/60 flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
                     >
-                      <ThumbsDown className="h-3.5 w-3.5" /> Reject
+                      <ThumbsDown className="h-3.5 w-3.5" />{" "}
+                      {t("reimbursements.details.reject")}
                     </button>
                     <button
                       type="button"
@@ -898,7 +915,8 @@ export default function ReimbursementDetailsPage() {
                       onClick={() => setIsApproveModalOpen(true)}
                       className="h-9 px-4 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
                     >
-                      <ThumbsUp className="h-3.5 w-3.5" /> Approve
+                      <ThumbsUp className="h-3.5 w-3.5" />{" "}
+                      {t("reimbursements.details.approve")}
                     </button>
                   </div>
                 )}
@@ -910,7 +928,8 @@ export default function ReimbursementDetailsPage() {
                   onClick={() => setIsCancelModalOpen(true)}
                   className="h-9 px-3.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
                 >
-                  <Ban className="h-3.5 w-3.5 text-slate-400" /> Cancel
+                  <Ban className="h-3.5 w-3.5 text-slate-400" />{" "}
+                  {t("reimbursements.details.cancel")}
                 </button>
               )}
             </>
@@ -930,7 +949,8 @@ export default function ReimbursementDetailsPage() {
                     disabled={isSaving}
                     className="h-9 px-4 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 flex items-center gap-1.5 shadow-sm"
                   >
-                    <X className="h-3.5 w-3.5" /> Discard
+                    <X className="h-3.5 w-3.5" />{" "}
+                    {t("reimbursements.details.discard")}
                   </button>
                   <button
                     type="button"
@@ -941,7 +961,9 @@ export default function ReimbursementDetailsPage() {
                     className="h-9 px-4 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 flex items-center gap-1.5 shadow-sm transition-colors disabled:opacity-50"
                   >
                     <Save className="h-3.5 w-3.5" />{" "}
-                    {isSaving ? "Saving..." : "Save Changes"}
+                    {isSaving
+                      ? t("reimbursements.details.saving")
+                      : t("reimbursements.details.saveChanges")}
                   </button>
                 </>
               ) : (
@@ -950,7 +972,8 @@ export default function ReimbursementDetailsPage() {
                   onClick={() => setIsEditing(true)}
                   className="h-9 px-4 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 flex items-center gap-1.5 shadow-sm transition-colors"
                 >
-                  <Edit3 className="h-3.5 w-3.5" /> Edit Request Form
+                  <Edit3 className="h-3.5 w-3.5" />{" "}
+                  {t("reimbursements.details.editForm")}
                 </button>
               )}
             </div>
@@ -962,13 +985,13 @@ export default function ReimbursementDetailsPage() {
         <div className="lg:col-span-8 flex flex-col gap-6">
           <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm flex flex-col gap-4">
             <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest border-b border-slate-50 pb-2">
-              Primary Parameter Details
+              {t("reimbursements.details.primaryParameters")}
             </h2>
 
             {record.status === "rejected" && record.rejection_reason && (
               <div className="p-4 bg-rose-50 border border-rose-100 text-rose-800 rounded-xl space-y-1 text-xs">
                 <span className="font-bold text-[10px] text-rose-500 uppercase tracking-wide block">
-                  Rejection Audit Parameter Description Note
+                  {t("reimbursements.details.rejectionNote")}
                 </span>
                 <p className="font-mono bg-white p-2.5 border border-rose-200/60 rounded-lg font-medium leading-relaxed shadow-inner text-slate-700">
                   {record.rejection_reason}
@@ -979,8 +1002,8 @@ export default function ReimbursementDetailsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-medium text-slate-600">
               <div className="flex flex-col gap-1 p-3 bg-slate-50 rounded-xl border border-slate-100">
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                  <Ticket className="h-3 w-3 text-indigo-500" /> Trouble Ticket
-                  ID Reference
+                  <Ticket className="h-3 w-3 text-indigo-500" />{" "}
+                  {t("reimbursements.details.troubleTicket")}
                 </span>
                 {isEditing ? (
                   <input
@@ -998,8 +1021,8 @@ export default function ReimbursementDetailsPage() {
 
               <div className="flex flex-col gap-1 p-3 bg-slate-50 rounded-xl border border-slate-100">
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                  <Package className="h-3 w-3 text-indigo-500" /> Reimbursement
-                  Mode Type
+                  <Package className="h-3 w-3 text-indigo-500" />{" "}
+                  {t("reimbursements.details.reimbursementMode")}
                 </span>
                 {isEditing ? (
                   <div className="grid grid-cols-2 bg-slate-100 rounded-lg p-0.5 mt-1">
@@ -1013,7 +1036,7 @@ export default function ReimbursementDetailsPage() {
                           : "text-slate-500 hover:text-slate-700",
                       )}
                     >
-                      AUTO
+                      {t("reimbursements.create.auto")}
                     </button>
                     <button
                       type="button"
@@ -1025,7 +1048,7 @@ export default function ReimbursementDetailsPage() {
                           : "text-slate-500 hover:text-slate-700",
                       )}
                     >
-                      MANUAL
+                      {t("reimbursements.create.manual")}
                     </button>
                   </div>
                 ) : (
@@ -1038,15 +1061,16 @@ export default function ReimbursementDetailsPage() {
                           : "bg-blue-500",
                       )}
                     />
-                    {record.reimbursement_mode} DISPATCH
+                    {record.reimbursement_mode}{" "}
+                    {t("reimbursements.details.dispatch")}
                   </span>
                 )}
               </div>
 
               <div className="flex flex-col gap-1 p-3 bg-slate-50 rounded-xl border border-slate-100">
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                  <Coins className="h-3 w-3 text-indigo-500" /> Distribution
-                  Strategy Scope
+                  <Coins className="h-3 w-3 text-indigo-500" />{" "}
+                  {t("reimbursements.details.distributionScope")}
                 </span>
                 {isEditing ? (
                   <div className="grid grid-cols-2 bg-slate-100 rounded-lg p-0.5 mt-1">
@@ -1060,7 +1084,7 @@ export default function ReimbursementDetailsPage() {
                           : "text-slate-500 hover:text-slate-700",
                       )}
                     >
-                      SINGLE TRANSACTION
+                      {t("reimbursements.details.singleTransaction")}
                     </button>
                     <button
                       type="button"
@@ -1072,22 +1096,22 @@ export default function ReimbursementDetailsPage() {
                           : "text-slate-500 hover:text-slate-700",
                       )}
                     >
-                      BULK MATRIX
+                      {t("reimbursements.details.bulkMatrix")}
                     </button>
                   </div>
                 ) : (
                   <span className="font-bold text-slate-900 mt-1">
                     {isBulk
-                      ? "BULK MATRIX PROCESSING FILE"
-                      : "SINGLE TRANSACTION TARGET"}
+                      ? t("reimbursements.details.bulkMatrixFile")
+                      : t("reimbursements.details.singleTarget")}
                   </span>
                 )}
               </div>
 
               <div className="flex flex-col gap-1 p-3 bg-slate-50 rounded-xl border border-slate-100">
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                  <Package className="h-3 w-3 text-indigo-500" /> Reimbursement
-                  Allocation Type
+                  <Package className="h-3 w-3 text-indigo-500" />{" "}
+                  {t("reimbursements.details.allocationType")}
                 </span>
                 {isEditing ? (
                   <div className="grid grid-cols-2 bg-slate-100 rounded-lg p-0.5 mt-1">
@@ -1118,7 +1142,7 @@ export default function ReimbursementDetailsPage() {
                   </div>
                 ) : (
                   <span className="font-bold text-slate-900 mt-1 uppercase">
-                    {reimbursementType} ALLOCATION
+                    {reimbursementType} {t("reimbursements.details.allocation")}
                   </span>
                 )}
               </div>
@@ -1127,8 +1151,8 @@ export default function ReimbursementDetailsPage() {
             {!isBulk && (
               <div className="flex flex-col gap-1 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs animate-in fade-in duration-200">
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                  <Phone className="h-3 w-3 text-indigo-500" /> Target
-                  Subscriber Number (MSISDN)
+                  <Phone className="h-3 w-3 text-indigo-500" />{" "}
+                  {t("reimbursements.details.targetMsisdn")}
                 </span>
                 {isEditing ? (
                   <input
@@ -1140,7 +1164,7 @@ export default function ReimbursementDetailsPage() {
                   />
                 ) : (
                   <span className="font-mono text-slate-900 font-bold text-sm mt-0.5">
-                    {msisdn || "No targeted subscriber assigned"}
+                    {msisdn || t("reimbursements.details.noTargetAssigned")}
                   </span>
                 )}
               </div>
@@ -1148,8 +1172,8 @@ export default function ReimbursementDetailsPage() {
 
             <div className="flex flex-col gap-1 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs">
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                <Package className="h-3 w-3 text-indigo-500" /> Bundle / Airtime
-                Value
+                <Package className="h-3 w-3 text-indigo-500" />{" "}
+                {t("reimbursements.details.bundleOrAirtime")}
               </span>
 
               {isEditing ? (
@@ -1197,7 +1221,9 @@ export default function ReimbursementDetailsPage() {
                             <Search className="h-3.5 w-3.5 text-slate-400" />
                             <input
                               type="text"
-                              placeholder="Search current category list items..."
+                              placeholder={t(
+                                "reimbursements.create.searchBundlePlaceholder",
+                              )}
                               value={searchQuery}
                               onChange={(e) => setSearchQuery(e.target.value)}
                               className="w-full bg-transparent text-[11px] font-medium outline-none text-slate-700"
@@ -1206,7 +1232,7 @@ export default function ReimbursementDetailsPage() {
                           <div className="flex flex-col gap-0.5">
                             {filteredBundles.length === 0 ? (
                               <div className="text-center p-3 text-slate-400 text-[10px] font-mono">
-                                No matching bundles found...
+                                {t("reimbursements.create.noCatalogFound")}
                               </div>
                             ) : (
                               filteredBundles.map((pkg) => (
@@ -1230,7 +1256,8 @@ export default function ReimbursementDetailsPage() {
                                   </div>
                                   <div className="flex items-center justify-between w-full mt-1">
                                     <span className="font-mono text-[10px] text-slate-500">
-                                      Offer ID: {pkg.offer_id}
+                                      {t("reimbursements.create.offerId")}:{" "}
+                                      {pkg.offer_id}
                                     </span>
                                     <span className="font-mono text-[10px] bg-slate-200/60 px-1.5 py-0.5 rounded text-slate-600">
                                       {pkg.price}
@@ -1265,7 +1292,7 @@ export default function ReimbursementDetailsPage() {
                     record.distribution_mode === "MANY_MANY" ? (
                       <span className="inline-flex items-center gap-1.5 text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-1 rounded-md">
                         <Layers className="h-3.5 w-3.5" />
-                        Multi-Bundle (Defined per subscriber in input file)
+                        {t("reimbursements.details.multiBundle")}
                       </span>
                     ) : bundle ? (
                       <BundleDisplay
@@ -1274,10 +1301,10 @@ export default function ReimbursementDetailsPage() {
                         price={bundle?.price}
                       />
                     ) : (
-                      "None chosen"
+                      t("reimbursements.details.noneChosen")
                     )
                   ) : (
-                    `AIRTIME AMOUNT: ${amount}`
+                    t("reimbursements.details.airtimeAmount", { amount })
                   )}
                 </span>
               )}
@@ -1285,8 +1312,8 @@ export default function ReimbursementDetailsPage() {
 
             <div className="flex flex-col gap-1.5 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs">
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                <FileText className="h-3 w-3 text-indigo-500" /> Reimbursement
-                Description
+                <FileText className="h-3 w-3 text-indigo-500" />{" "}
+                {t("reimbursements.details.description")}
               </span>
               {isEditing ? (
                 <textarea
@@ -1297,7 +1324,7 @@ export default function ReimbursementDetailsPage() {
                 />
               ) : (
                 <p className="text-slate-700 font-medium leading-relaxed mt-0.5">
-                  {description || "No notes provided."}
+                  {description || t("reimbursements.details.noNotes")}
                 </p>
               )}
             </div>
@@ -1309,20 +1336,20 @@ export default function ReimbursementDetailsPage() {
               <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
                 <Layers className="h-4 w-4 text-indigo-600" />
                 <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                  Target Subscribers List
+                  {t("reimbursements.details.targetList")}
                 </h3>
               </div>
 
               <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 bg-slate-50/70 border border-slate-200/60 rounded-xl p-3">
                 <div className="text-xs space-y-1">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                    List File Reference ID
+                    {t("reimbursements.details.listRefId")}
                   </span>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-mono font-bold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-sm">
                       {newFileReferenceId ||
                         currentFileReferenceId ||
-                        "No active file reference"}
+                        t("reimbursements.details.noActiveRef")}
                     </span>
                     <span className="text-[11px] font-bold text-slate-500 bg-slate-200/60 px-2 py-0.5 rounded">
                       {" "}
@@ -1333,11 +1360,11 @@ export default function ReimbursementDetailsPage() {
                             bulkMetrics.total ??
                             0)}
                       </span>{" "}
-                      subscribers
+                      {t("reimbursements.details.subscribersCount")}
                     </span>
                     {newFileReferenceId && (
                       <span className="text-[10px] text-indigo-600 font-bold animate-pulse">
-                        (Staged Overwrite)
+                        {t("reimbursements.details.stagedOverwrite")}
                       </span>
                     )}
                   </div>
@@ -1352,8 +1379,8 @@ export default function ReimbursementDetailsPage() {
                   >
                     <FileDown className="h-3.5 w-3.5" />
                     {isDownloadingInput
-                      ? "Streaming..."
-                      : "Download Original Input"}
+                      ? t("reimbursements.details.streaming")
+                      : t("reimbursements.details.downloadInput")}
                   </button>
                 )}
               </div>
@@ -1370,8 +1397,7 @@ export default function ReimbursementDetailsPage() {
                 record.status === "pending" && (
                   <div className="bg-slate-50 border border-slate-100 rounded-xl py-3 text-center text-slate-400 text-xs font-bold font-mono flex items-center justify-center gap-2">
                     <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                    SUBSCRIBER DATA LOCKED • EDIT WORKSPACE TO STAGE DATA
-                    REPLACEMENTS
+                    {t("reimbursements.details.dataLocked")}
                   </div>
                 )
               )}
@@ -1388,17 +1414,18 @@ export default function ReimbursementDetailsPage() {
                   </div>
                   <div>
                     <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                      Provisioning Execution Summary
+                      {t("reimbursements.details.provSummary")}
                     </h3>
                     <p className="text-[11px] text-slate-500 font-medium">
-                      Real-time execution stats and administrative logs
+                      {t("reimbursements.details.provSubtitle")}
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-mono font-bold px-2.5 py-1 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg">
-                    {provExec.execution_type} EXECUTION
+                    {provExec.execution_type}{" "}
+                    {t("reimbursements.details.execution")}
                   </span>
                   <span
                     className={cn(
@@ -1425,7 +1452,7 @@ export default function ReimbursementDetailsPage() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-3 flex flex-col gap-1">
                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                    Total Input
+                    {t("reimbursements.details.totalInput")}
                   </span>
                   <span className="text-lg font-black text-slate-900 font-mono">
                     {provExec.total_input ?? 0}
@@ -1433,7 +1460,7 @@ export default function ReimbursementDetailsPage() {
                 </div>
                 <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3 flex flex-col gap-1">
                   <span className="text-[9px] font-bold text-blue-500 uppercase tracking-wider">
-                    Total Processed
+                    {t("reimbursements.details.totalProcessed")}
                   </span>
                   <span className="text-lg font-black text-blue-700 font-mono">
                     {provExec.total_processed ?? 0}
@@ -1441,7 +1468,7 @@ export default function ReimbursementDetailsPage() {
                 </div>
                 <div className="bg-emerald-50/40 border border-emerald-100 rounded-xl p-3 flex flex-col gap-1">
                   <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider">
-                    Successful
+                    {t("reimbursements.details.successful")}
                   </span>
                   <span className="text-lg font-black text-emerald-700 font-mono">
                     {provExec.total_success ?? 0}
@@ -1449,7 +1476,7 @@ export default function ReimbursementDetailsPage() {
                 </div>
                 <div className="bg-rose-50/40 border border-rose-100 rounded-xl p-3 flex flex-col gap-1">
                   <span className="text-[9px] font-bold text-rose-500 uppercase tracking-wider">
-                    Failed
+                    {t("reimbursements.details.failed")}
                   </span>
                   <span className="text-lg font-black text-rose-700 font-mono">
                     {provExec.total_failed ?? 0}
@@ -1466,7 +1493,9 @@ export default function ReimbursementDetailsPage() {
                   className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition-all shadow-sm disabled:opacity-50"
                 >
                   <Download className="h-3.5 w-3.5" />
-                  {isDownloadingReport ? "Downloading..." : "Download Report"}
+                  {isDownloadingReport
+                    ? t("reimbursements.details.downloadingReport")
+                    : t("reimbursements.details.downloadReport")}
                 </button>
 
                 {/* View Command Log - Only visible if user has command log permissions */}
@@ -1485,7 +1514,7 @@ export default function ReimbursementDetailsPage() {
                     className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 text-slate-700 transition-all border border-slate-200 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     <Terminal className="h-3.5 w-3.5 text-slate-500" />
-                    View Command Log
+                    {t("reimbursements.details.viewCommandLog")}
                   </button>
                 )}
 
@@ -1505,7 +1534,7 @@ export default function ReimbursementDetailsPage() {
                     className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 text-slate-700 transition-all border border-slate-200 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     <LayersIcon className="h-3.5 w-3.5 text-slate-500" />
-                    View Batch Job
+                    {t("reimbursements.details.viewBatchJob")}
                   </button>
                 )}
               </div>
@@ -1519,7 +1548,7 @@ export default function ReimbursementDetailsPage() {
           <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm flex flex-col gap-4">
             <div className="flex justify-between items-center border-b border-slate-50 pb-2.5">
               <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest">
-                Workflow Status Tracks
+                {t("reimbursements.details.workflowTracks")}
               </h2>
               {renderStatusBadge(record.status)}
             </div>
@@ -1532,12 +1561,13 @@ export default function ReimbursementDetailsPage() {
 
                 <div>
                   <h4 className="text-[11px] font-bold text-slate-800 uppercase tracking-tight">
-                    Step 1: Request Initialization
+                    {t("reimbursements.details.step1")}
                   </h4>
                   <div className="mt-1.5 p-2.5 rounded-xl bg-slate-50 border border-slate-100/70 text-[10px] font-medium text-slate-500 space-y-1">
                     <div className="flex justify-between items-center">
                       <span className="text-slate-400 font-bold flex items-center gap-1 uppercase tracking-wider">
-                        <User className="h-2.5 w-2.5" /> Requester
+                        <User className="h-2.5 w-2.5" />{" "}
+                        {t("reimbursements.details.requester")}
                       </span>
                       <span className="font-bold text-slate-700 font-mono">
                         {record.requester_name ||
@@ -1546,7 +1576,8 @@ export default function ReimbursementDetailsPage() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-slate-400 font-bold flex items-center gap-1 uppercase tracking-wider">
-                        <Clock className="h-2.5 w-2.5" /> Registered
+                        <Clock className="h-2.5 w-2.5" />{" "}
+                        {t("reimbursements.details.registered")}
                       </span>
                       <span className="font-bold text-slate-600">
                         {new Date(record.created_at).toLocaleString()}
@@ -1577,7 +1608,7 @@ export default function ReimbursementDetailsPage() {
 
                 <div>
                   <h4 className="text-[11px] font-bold text-slate-800 uppercase tracking-tight">
-                    Step 2: Operational Governance Review
+                    {t("reimbursements.details.step2")}
                   </h4>
 
                   {record.status !== "pending" ? (
@@ -1593,7 +1624,8 @@ export default function ReimbursementDetailsPage() {
                     >
                       <div className="flex justify-between items-center">
                         <span className="text-slate-400 font-bold flex items-center gap-1 uppercase tracking-wider">
-                          <User className="h-2.5 w-2.5" /> Reviewed By
+                          <User className="h-2.5 w-2.5" />{" "}
+                          {t("reimbursements.details.reviewedBy")}
                         </span>
                         <span className="font-bold text-slate-700 font-mono">
                           {record.reviewer_name ||
@@ -1602,7 +1634,8 @@ export default function ReimbursementDetailsPage() {
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-slate-400 font-bold flex items-center gap-1 uppercase tracking-wider">
-                          <Clock className="h-2.5 w-2.5" /> Processed On
+                          <Clock className="h-2.5 w-2.5" />{" "}
+                          {t("reimbursements.details.processedOn")}
                         </span>
                         <span className="font-bold text-slate-600">
                           {record.reviewed_at
@@ -1617,7 +1650,7 @@ export default function ReimbursementDetailsPage() {
                         className="h-3 w-3 text-amber-600 shrink-0 animate-spin"
                         style={{ animationDuration: "3s" }}
                       />
-                      Awaiting administration decision matrix review parameters.
+                      {t("reimbursements.details.awaitingReview")}
                     </div>
                   )}
                 </div>
@@ -1647,7 +1680,7 @@ export default function ReimbursementDetailsPage() {
 
                 <div>
                   <h4 className="text-[11px] font-bold text-slate-800 uppercase tracking-tight">
-                    Step 3: Provisioning Execution
+                    {t("reimbursements.details.step3")}
                   </h4>
 
                   {provExec ? (
@@ -1662,27 +1695,28 @@ export default function ReimbursementDetailsPage() {
                       <div className="flex justify-between items-center">
                         <span className="text-slate-400 font-bold flex items-center gap-1 uppercase tracking-wider">
                           <Bot className="h-2.5 w-2.5 text-indigo-500" />{" "}
-                          Executed By
+                          {t("reimbursements.details.executedBy")}
                         </span>
                         <span className="font-bold text-slate-700 font-mono">
-                          System Auto-Dispatch
+                          {t("reimbursements.details.systemAutoDispatch")}
                         </span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-slate-400 font-bold flex items-center gap-1 uppercase tracking-wider">
-                          <Clock className="h-2.5 w-2.5" /> Executed On
+                          <Clock className="h-2.5 w-2.5" />{" "}
+                          {t("reimbursements.details.executedOn")}
                         </span>
                         <span className="font-bold text-slate-600">
                           {provExec.completed_at || provExec.started_at
                             ? new Date(
                                 (provExec.completed_at || provExec.started_at)!,
                               ).toLocaleString()
-                            : "In Progress"}
+                            : t("reimbursements.details.inProgress")}
                         </span>
                       </div>
                       <div className="flex justify-between items-center pt-1 border-t border-slate-100/80 mt-1">
                         <span className="text-slate-400 font-bold uppercase tracking-wider">
-                          Result Status
+                          {t("reimbursements.details.resultStatus")}
                         </span>
                         <span
                           className={cn(
@@ -1698,7 +1732,7 @@ export default function ReimbursementDetailsPage() {
                     </div>
                   ) : (
                     <div className="mt-1.5 p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-[10px] text-slate-400 font-medium">
-                      Pending system dispatch trigger following review.
+                      {t("reimbursements.details.pendingDispatch")}
                     </div>
                   )}
                 </div>
@@ -1709,15 +1743,15 @@ export default function ReimbursementDetailsPage() {
           {/* Evidence Attachments Panel */}
           <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm flex flex-col gap-3">
             <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest border-b border-slate-50 pb-2">
-              Evidence Documents ({attachments.length})
+              {t("reimbursements.details.evidenceDocs")} ({attachments.length})
             </h2>
 
             {isEditing && !terminalState && (
               <label className="border border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/20 rounded-xl p-3 text-center cursor-pointer flex flex-col items-center justify-center gap-1 text-[11px] font-bold text-indigo-600 shadow-sm group">
                 <Paperclip className="h-4 w-4 group-hover:scale-110 transition-transform" />
                 {isUploading
-                  ? "Uploading file stream..."
-                  : "Append Support Document Attachment"}
+                  ? t("reimbursements.details.uploadingStream")
+                  : t("reimbursements.details.appendDocument")}
                 <input
                   type="file"
                   multiple
@@ -1731,7 +1765,7 @@ export default function ReimbursementDetailsPage() {
             <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
               {attachments.length === 0 ? (
                 <div className="text-center p-4 bg-slate-50 rounded-xl text-slate-400 text-[10px] font-medium border border-slate-100">
-                  No verification attachments found.
+                  {t("reimbursements.details.noVerificationAttachments")}
                 </div>
               ) : (
                 attachments.map((att) => (
@@ -1790,8 +1824,8 @@ export default function ReimbursementDetailsPage() {
           <div className="bg-white w-full max-w-md rounded-2xl border border-slate-200 p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-100">
             <div className="flex items-center justify-between border-b pb-2">
               <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Confirm
-                Approval
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />{" "}
+                {t("reimbursements.details.confirmApprovalTitle")}
               </h3>
               <button
                 type="button"
@@ -1804,9 +1838,7 @@ export default function ReimbursementDetailsPage() {
 
             <form onSubmit={handleApproveSubmit} className="space-y-4">
               <div className="text-xs font-medium text-slate-600 leading-relaxed">
-                Are you sure you want to approve this reimbursement allocation
-                context? This operation commits data parameters to active
-                execution layers.
+                {t("reimbursements.details.confirmApprovalDesc")}
               </div>
 
               <div className="flex items-center justify-end gap-2 border-t pt-2.5 border-slate-100">
@@ -1815,14 +1847,16 @@ export default function ReimbursementDetailsPage() {
                   onClick={() => setIsApproveModalOpen(false)}
                   className="h-8 px-3 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
                 >
-                  Cancel
+                  {t("reimbursements.details.cancel")}
                 </button>
                 <button
                   type="submit"
                   disabled={isActioning}
                   className="h-8 px-3.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-50"
                 >
-                  {isActioning ? "Processing..." : "Confirm Approval"}
+                  {isActioning
+                    ? t("reimbursements.details.processing")
+                    : t("reimbursements.details.confirmApproval")}
                 </button>
               </div>
             </form>
@@ -1835,8 +1869,8 @@ export default function ReimbursementDetailsPage() {
           <div className="bg-white w-full max-w-md rounded-2xl border border-slate-200 p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-100">
             <div className="flex items-center justify-between border-b pb-2">
               <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight flex items-center gap-1.5">
-                <AlertCircle className="h-4 w-4 text-rose-500" /> Provide
-                Rejection Reason
+                <AlertCircle className="h-4 w-4 text-rose-500" />{" "}
+                {t("reimbursements.details.rejectionReasonTitle")}
               </h3>
               <button
                 type="button"
@@ -1853,14 +1887,14 @@ export default function ReimbursementDetailsPage() {
             <form onSubmit={handleRejectSubmit} className="space-y-4">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  Audit Explanation / Context Notes
+                  {t("reimbursements.details.rejectionAuditLabel")}
                 </label>
                 <textarea
                   required
                   rows={3}
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
-                  placeholder="Explain why this reimbursement ledger payload request is explicitly denied..."
+                  placeholder={t("reimbursements.details.rejectionPlaceholder")}
                   className="w-full text-xs font-medium font-mono p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-rose-500 text-slate-700 resize-none leading-relaxed"
                 />
               </div>
@@ -1874,14 +1908,16 @@ export default function ReimbursementDetailsPage() {
                   }}
                   className="h-8 px-3 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
                 >
-                  Cancel
+                  {t("reimbursements.details.cancel")}
                 </button>
                 <button
                   type="submit"
                   disabled={isActioning || !rejectionReason.trim()}
                   className="h-8 px-3.5 bg-rose-600 text-white rounded-lg text-xs font-bold hover:bg-rose-700 transition-colors shadow-sm disabled:opacity-50"
                 >
-                  {isActioning ? "Processing..." : "Confirm Denial"}
+                  {isActioning
+                    ? t("reimbursements.details.processing")
+                    : t("reimbursements.details.confirmDenial")}
                 </button>
               </div>
             </form>
@@ -1894,7 +1930,8 @@ export default function ReimbursementDetailsPage() {
           <div className="bg-white w-full max-w-md rounded-2xl border border-slate-200 p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-100">
             <div className="flex items-center justify-between border-b pb-2">
               <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight flex items-center gap-1.5">
-                <Ban className="h-4 w-4 text-slate-500" /> Cancel Request
+                <Ban className="h-4 w-4 text-slate-500" />{" "}
+                {t("reimbursements.details.cancelRequestTitle")}
               </h3>
               <button
                 type="button"
@@ -1907,9 +1944,7 @@ export default function ReimbursementDetailsPage() {
 
             <form onSubmit={handleCancelSubmit} className="space-y-4">
               <div className="text-xs font-medium text-slate-600 leading-relaxed">
-                Are you sure you want to cancel this pending reimbursement
-                request? This state mutation transitions the item into an
-                inactive ledger log.
+                {t("reimbursements.details.cancelRequestDesc")}
               </div>
 
               <div className="flex items-center justify-end gap-2 border-t pt-2.5 border-slate-100">
@@ -1918,14 +1953,16 @@ export default function ReimbursementDetailsPage() {
                   onClick={() => setIsCancelModalOpen(false)}
                   className="h-8 px-3 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
                 >
-                  Discard
+                  {t("reimbursements.details.discard")}
                 </button>
                 <button
                   type="submit"
                   disabled={isActioning}
-                  className="h-8 px-3.5 bg-slate-800 text-white rounded-lg text-xs font-bold hover:bg-slate-900 transition-colors shadow-sm disabled:opacity-50"
+                  className="h-8 px-3.5 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50"
                 >
-                  {isActioning ? "Processing..." : "Confirm Cancellation"}
+                  {isActioning
+                    ? t("reimbursements.details.processing")
+                    : t("reimbursements.details.cancel")}
                 </button>
               </div>
             </form>

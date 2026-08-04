@@ -1,20 +1,34 @@
+import { useTranslation } from "react-i18next";
+
 export function ActiveBatches() {
+  const { t } = useTranslation();
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
       <div className="p-5 border-b border-slate-100 flex justify-between items-center">
-        <h2 className="font-bold text-slate-800 text-base">Active Batches</h2>
+        <h2 className="font-bold text-slate-800 text-base">
+          {t("dashboard.activeBatches.title")}
+        </h2>
         <button className="text-blue-600 text-xs font-semibold hover:underline">
-          View All
+          {t("dashboard.viewAll")}
         </button>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50/50 text-slate-400 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100">
             <tr>
-              <th className="px-6 py-3">Job Name / Schedule</th>
-              <th className="px-6 py-3">Status</th>
-              <th className="px-6 py-3">Progress</th>
-              <th className="px-6 py-3 text-right">Timing</th>
+              <th className="px-6 py-3">
+                {t("dashboard.activeBatches.table.jobName")}
+              </th>
+              <th className="px-6 py-3">
+                {t("dashboard.activeBatches.table.status")}
+              </th>
+              <th className="px-6 py-3">
+                {t("dashboard.activeBatches.table.progress")}
+              </th>
+              <th className="px-6 py-3 text-right">
+                {t("dashboard.activeBatches.table.timing")}
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -23,12 +37,14 @@ export function ActiveBatches() {
                 <p className="font-bold text-slate-900">
                   February Promo Campaign
                 </p>
-                <p className="text-[11px] text-slate-400">One-time Schedule</p>
+                <p className="text-[11px] text-slate-400">
+                  {t("dashboard.activeBatches.oneTimeSchedule")}
+                </p>
               </td>
               <td className="px-6 py-4">
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-100">
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-2 animate-pulse" />
-                  Processing
+                  {t("dashboard.activeBatches.processing")}
                 </span>
               </td>
               <td className="px-6 py-4 w-64">
@@ -43,8 +59,12 @@ export function ActiveBatches() {
                 </div>
               </td>
               <td className="px-6 py-4 text-right">
-                <p className="font-bold text-slate-900">ETA: ~12m</p>
-                <p className="text-[11px] text-slate-400">Started 14:30</p>
+                <p className="font-bold text-slate-900">
+                  {t("dashboard.activeBatches.eta", { time: "12m" })}
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  {t("dashboard.activeBatches.started", { time: "14:30" })}
+                </p>
               </td>
             </tr>
           </tbody>

@@ -7,20 +7,23 @@ import { NavigationBar } from "./NavigationBar";
 import { useTabStore } from "@/store/tabStore";
 import { renderTabContent } from "@/config/tabRenderConfig";
 import { cn } from "@/lib/utils";
-
-// Helper to get tab name from the base domain path
-function getTabTitleFromPath(basePath: string): string {
-  if (!basePath || basePath === "dashboard") return "Dashboard";
-  const clean = basePath.replace(/^\/+|\/+$/g, "").replace(/-/g, " ");
-  return clean.charAt(0).toUpperCase() + clean.slice(1);
-}
+import { useTranslation } from "react-i18next";
 
 export default function MainLayout() {
+  const { t } = useTranslation();
   const tabs = useTabStore((s) => s.tabs);
   const activeTabId = useTabStore((s) => s.activeTabId);
   const setActiveTab = useTabStore((s) => s.setActiveTab);
 
   const location = useLocation();
+
+  const getTabTitleFromPath = (basePath: string): string => {
+    if (!basePath || basePath === "dashboard") {
+      return t("navigation.dashboard");
+    }
+    const clean = basePath.replace(/^\/+|\/+$/g, "").replace(/-/g, " ");
+    return clean.charAt(0).toUpperCase() + clean.slice(1);
+  };
 
   // ROUTER WATCHER: Groups nested layouts into their parent feature tab
   useEffect(() => {
@@ -33,7 +36,7 @@ export default function MainLayout() {
 
     const { closingTabId } = useTabStore.getState();
 
-    // 🚨 CRITICAL: prevent recreation during close cycle
+    // Prevent recreation during close cycle
     if (closingTabId === derivedTabId) {
       return;
     }
@@ -63,7 +66,7 @@ export default function MainLayout() {
     if (activeTabId !== existingTab.id) {
       setActiveTab(existingTab.id);
     }
-  }, [location.pathname]);
+  }, [location.pathname, t]);
 
   return (
     <div className="h-screen bg-slate-50 flex overflow-hidden w-full">

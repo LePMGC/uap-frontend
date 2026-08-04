@@ -3,36 +3,16 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
 
+// Import translation JSON files from the public locales folder
+import enTranslation from "../public/locales/en.json";
+import frTranslation from "../public/locales/fr.json";
+
 const resources = {
   en: {
-    translation: {
-      sidebar: {
-        system: "System",
-        profile: "Profile",
-        logout: "Logout",
-        language: "Language",
-      },
-      languages: {
-        en: "English",
-        fr: "Français",
-        es: "Español",
-      },
-    },
+    translation: enTranslation,
   },
   fr: {
-    translation: {
-      sidebar: {
-        system: "Système",
-        profile: "Profil",
-        logout: "Déconnexion",
-        language: "Langue",
-      },
-      languages: {
-        en: "English",
-        fr: "Français",
-        es: "Español",
-      },
-    },
+    translation: frTranslation,
   },
 };
 
@@ -42,8 +22,13 @@ i18n
   .init({
     resources,
     fallbackLng: "en",
+    supportedLngs: ["en", "fr"],
     interpolation: {
-      escapeValue: false,
+      escapeValue: false, // React already escapes by default
+    },
+    detection: {
+      order: ["localStorage", "navigator"],
+      caches: ["localStorage"],
     },
   });
 

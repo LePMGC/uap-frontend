@@ -1,10 +1,12 @@
 import { DashboardService } from "@/services/dashboardService";
 import { ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 type RecentActivityProps = { isLoading: boolean };
 
 export function RecentActivity({ isLoading }: RecentActivityProps) {
+  const { t } = useTranslation();
   const [activities, setActivities] = useState<any[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(true);
 
@@ -21,10 +23,24 @@ export function RecentActivity({ isLoading }: RecentActivityProps) {
 
   useEffect(() => {
     fetchActivities();
-    // Auto-refresh every 30 seconds
     const interval = setInterval(fetchActivities, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "Completed":
+        return t("dashboard.recentActivity.completed");
+      case "Pending":
+        return t("dashboard.recentActivity.pending");
+      case "Processing":
+        return t("dashboard.recentActivity.processing");
+      case "Failed":
+        return t("dashboard.recentActivity.failed");
+      default:
+        return status;
+    }
+  };
 
   if (activitiesLoading) {
     return (
@@ -41,22 +57,39 @@ export function RecentActivity({ isLoading }: RecentActivityProps) {
       </div>
     );
   }
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
       <div className="p-6 border-b border-slate-100">
-        <h2 className="font-bold text-slate-800 text-base">Recent Activity</h2>
+        <h2 className="font-bold text-slate-800 text-base">
+          {t("dashboard.recentActivity.title")}
+        </h2>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead className="bg-slate-50/50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">
             <tr>
-              <th className="px-6 py-4">Type</th>
-              <th className="px-6 py-4">Name / Trigger</th>
-              <th className="px-6 py-4">Status</th>
-              <th className="px-6 py-4">Rows</th>
-              <th className="px-6 py-4">Success</th>
-              <th className="px-6 py-4">Time</th>
-              <th className="px-6 py-4 text-right">Action</th>
+              <th className="px-6 py-4">
+                {t("dashboard.recentActivity.table.type")}
+              </th>
+              <th className="px-6 py-4">
+                {t("dashboard.recentActivity.table.nameTrigger")}
+              </th>
+              <th className="px-6 py-4">
+                {t("dashboard.recentActivity.table.status")}
+              </th>
+              <th className="px-6 py-4">
+                {t("dashboard.recentActivity.table.rows")}
+              </th>
+              <th className="px-6 py-4">
+                {t("dashboard.recentActivity.table.success")}
+              </th>
+              <th className="px-6 py-4">
+                {t("dashboard.recentActivity.table.time")}
+              </th>
+              <th className="px-6 py-4 text-right">
+                {t("dashboard.recentActivity.table.action")}
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -84,7 +117,7 @@ export function RecentActivity({ isLoading }: RecentActivityProps) {
                           : "bg-red-50 text-red-700 border-red-100"
                     }`}
                   >
-                    {act.status}
+                    {getStatusLabel(act.status)}
                   </span>
                 </td>
                 <td className="px-6 py-5 text-sm font-medium text-slate-600">
@@ -96,7 +129,9 @@ export function RecentActivity({ isLoading }: RecentActivityProps) {
                 <td className="px-6 py-5 text-xs text-slate-400">{act.time}</td>
                 <td className="px-6 py-5 text-right">
                   <button className="text-blue-600 font-bold text-[11px] hover:text-blue-800 flex items-center justify-end gap-1 ml-auto group transition-colors">
-                    View {act.status === "Failed" ? "Error" : "Log"}
+                    {act.status === "Failed"
+                      ? t("dashboard.recentActivity.viewError")
+                      : t("dashboard.recentActivity.viewLog")}
                     <ChevronRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
                   </button>
                 </td>

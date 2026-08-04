@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { DashboardService } from "@/services/dashboardService";
+import { useTranslation } from "react-i18next";
 
 interface PlatformService {
   name: string;
@@ -13,6 +14,7 @@ export function PlatformHealth({
 }: {
   isLoading: boolean;
 }) {
+  const { t } = useTranslation();
   const [statusItems, setStatusItems] = useState<PlatformService[]>([]);
   const [internalLoading, setInternalLoading] = useState(true);
 
@@ -29,7 +31,6 @@ export function PlatformHealth({
 
   useEffect(() => {
     fetchHealth();
-    // Auto-refresh every 30 seconds
     const interval = setInterval(fetchHealth, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -39,13 +40,12 @@ export function PlatformHealth({
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
       <h2 className="font-bold text-slate-800 text-base mb-6">
-        Platform Health
+        {t("dashboard.platformHealth.title")}
       </h2>
 
       <div className="space-y-4">
         {showSkeleton
-          ? // Skeleton loader matches the height of real items
-            [...Array(3)].map((_, i) => (
+          ? [...Array(3)].map((_, i) => (
               <div
                 key={i}
                 className="h-[62px] w-full bg-slate-50 border border-slate-100 rounded-lg animate-pulse"
@@ -76,7 +76,9 @@ export function PlatformHealth({
                         : "bg-amber-100 text-amber-700"
                     }`}
                   >
-                    {item.status}
+                    {t(`dashboard.${item.status_type}`, {
+                      defaultValue: item.status,
+                    })}
                   </span>
                 </div>
               </div>

@@ -1,6 +1,6 @@
-// src/pages/reimbursements/CreateReimbursementPage.tsx
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   ArrowLeft,
   User,
@@ -54,6 +54,7 @@ interface BackendBundleItem {
 }
 
 export default function CreateReimbursementPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { showToast } = useToastStore();
 
@@ -71,7 +72,7 @@ export default function CreateReimbursementPage() {
     useState<AssetType>("BUNDLE");
   const [categories, setCategories] = useState<string[]>([]);
   const [bundles, setBundles] = useState<BackendBundleItem[]>([]);
-  const [isLoadingCatalog, setIsLoadingCatalog] = useState(false);
+  const [, setIsLoadingCatalog] = useState(false);
 
   const [selectedCategory, setSelectedCategory] = useState("");
   const [targetProductId, setTargetProductId] = useState("");
@@ -159,14 +160,14 @@ export default function CreateReimbursementPage() {
         }
       } catch (err) {
         console.error(err);
-        showToast("Unable to load reimbursement catalog.", "error");
+        showToast(t("reimbursements.create.toasts.catalogLoadError"), "error");
       } finally {
         setIsLoadingCatalog(false);
       }
     }
 
     loadCatalog();
-  }, [showToast]);
+  }, [showToast, t]);
 
   // Filter products by category and input text
   const filteredBundles = useMemo(() => {
@@ -185,7 +186,7 @@ export default function CreateReimbursementPage() {
     const found = bundles.find((b) => String(b.id) === String(targetProductId));
 
     if (!found) {
-      return "Select a bundle catalog item...";
+      return t("reimbursements.create.selectBundlePlaceholder");
     }
 
     return (
@@ -195,7 +196,7 @@ export default function CreateReimbursementPage() {
         price={found.price}
       />
     );
-  }, [bundles, targetProductId]);
+  }, [bundles, targetProductId, t]);
 
   // --- DYNAMIC LIVE FILE TEMPLATE DOWNLOAD HANDLER ---
   const handleTemplateDownload = async () => {
@@ -207,16 +208,10 @@ export default function CreateReimbursementPage() {
         templateFormat,
       );
 
-      showToast(
-        "Template spreadsheet layout saved to downloads directory.",
-        "success",
-      );
+      showToast(t("reimbursements.create.toasts.templateSaved"), "success");
     } catch (error) {
       console.error("Template down-stream extraction workflow failure:", error);
-      showToast(
-        "Failed to retrieve target template structure from API.",
-        "error",
-      );
+      showToast(t("reimbursements.create.toasts.templateFetchError"), "error");
     } finally {
       setIsDownloading(false);
     }
@@ -241,14 +236,13 @@ export default function CreateReimbursementPage() {
 
         if (response.metrics.invalid > 0) {
           showToast(
-            `Data matrix parsed with ${response.metrics.invalid} ingestion layout rule conflicts.`,
+            t("reimbursements.create.toasts.parseLayoutError", {
+              count: response.metrics.invalid,
+            }),
             "error",
           );
         } else {
-          showToast(
-            "Subscriber mapping file streams parsed successfully without defects.",
-            "success",
-          );
+          showToast(t("reimbursements.create.toasts.parseSuccess"), "success");
         }
       } else {
         throw new Error(
@@ -259,8 +253,7 @@ export default function CreateReimbursementPage() {
       setUploadedFile(null);
       setFileReferenceId(null);
       showToast(
-        err?.message ||
-          "Failed to parse data matrix sheet. Please ensure column layout criteria are satisfied.",
+        err?.message || t("reimbursements.create.toasts.parseFileError"),
         "error",
       );
     } finally {
@@ -297,12 +290,14 @@ export default function CreateReimbursementPage() {
 
       setAttachments((prev) => [...prev, ...uploadedItems]);
       showToast(
-        `Uploaded ${files.length} attachment(s) successfully.`,
+        t("reimbursements.create.toasts.attachmentSuccess", {
+          count: files.length,
+        }),
         "success",
       );
     } catch (error: any) {
       console.error("Attachment upload error:", error);
-      showToast("Failed to upload evidence files to server.", "error");
+      showToast(t("reimbursements.create.toasts.attachmentError"), "error");
     } finally {
       setIsUploadingAttachment(false);
       e.target.value = "";
@@ -311,7 +306,7 @@ export default function CreateReimbursementPage() {
 
   const removeAttachment = (id: string | number) => {
     setAttachments((prev) => prev.filter((a) => a.id !== id));
-    showToast("Evidence log attachment cleared", "success");
+    showToast(t("reimbursements.create.toasts.attachmentCleared"), "success");
   };
 
   // --- FINAL PAYLOAD COMPILE AND SUBMIT ---
@@ -319,7 +314,10 @@ export default function CreateReimbursementPage() {
     e.preventDefault();
 
     if (!ticketId.trim())
-      return showToast("Trouble Ticket identifier number is required", "error");
+      return showToast(
+        t("reimbursements.create.toasts.ticketIdRequired"),
+        "error",
+      );
 
     const payload: ReimbursementCreationPayload = {
       ticket_id: ticketId,
@@ -341,24 +339,30 @@ export default function CreateReimbursementPage() {
 
     if (distributionMode === "SINGLE_SINGLE") {
       if (!singleMsisdn.trim())
-        return showToast("Subscriber MSISDN parameter required", "error");
+        return showToast(
+          t("reimbursements.create.toasts.msisdnRequired"),
+          "error",
+        );
       payload.msisdn = singleMsisdn.trim();
       if (reimbursementType === "BUNDLE") {
         if (!targetProductId)
           return showToast(
-            "Select target asset package model mapping",
+            t("reimbursements.create.toasts.selectBundleError"),
             "error",
           );
         payload.target_product_id = targetProductId;
       } else {
         if (!amount || parseFloat(amount) <= 0)
-          return showToast("Specify valid airtime value", "error");
+          return showToast(
+            t("reimbursements.create.toasts.validAirtimeError"),
+            "error",
+          );
         payload.amount = parseFloat(amount);
       }
     } else {
       if (!fileReferenceId)
         return showToast(
-          "Please attach an initialization target source sheet",
+          t("reimbursements.create.toasts.attachFileError"),
           "error",
         );
 
@@ -367,14 +371,14 @@ export default function CreateReimbursementPage() {
         if (reimbursementType === "BUNDLE") {
           if (!targetProductId)
             return showToast(
-              "Select active template package mapping key",
+              t("reimbursements.create.toasts.selectTemplateKeyError"),
               "error",
             );
           payload.target_product_id = targetProductId;
         } else {
           if (!amount || parseFloat(amount) <= 0)
             return showToast(
-              "Specify shared airtime deployment amount",
+              t("reimbursements.create.toasts.specifyAirtimeError"),
               "error",
             );
           payload.amount = parseFloat(amount);
@@ -385,16 +389,10 @@ export default function CreateReimbursementPage() {
     setIsSubmitting(true);
     try {
       await reimbursementsService.createReimbursement(payload);
-      showToast(
-        "Adjustment records successfully submitted into checking stream logs",
-        "success",
-      );
+      showToast(t("reimbursements.create.toasts.submitSuccess"), "success");
       navigate("/reimbursements");
     } catch (err) {
-      showToast(
-        "Endpoint validation error initializing database asset logs",
-        "error",
-      );
+      showToast(t("reimbursements.create.toasts.submitError"), "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -413,7 +411,7 @@ export default function CreateReimbursementPage() {
         </button>
         <div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900">
-            Initialize Resource Reimbursement
+            {t("reimbursements.create.title")}
           </h1>
         </div>
       </div>
@@ -429,14 +427,14 @@ export default function CreateReimbursementPage() {
             <div className="border-b border-slate-100 pb-3 flex items-center gap-2">
               <Ticket className="h-4 w-4 text-indigo-600" />
               <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                1. Registry Context
+                {t("reimbursements.create.registryContext")}
               </h2>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-600">
-                  Trouble Ticket Reference Number{" "}
+                  {t("reimbursements.create.ticketId")}{" "}
                   <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -451,7 +449,7 @@ export default function CreateReimbursementPage() {
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-600">
-                  Execution Mode
+                  {t("reimbursements.create.executionMode")}
                 </label>
                 <div className="grid grid-cols-2 gap-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200">
                   <button
@@ -464,7 +462,7 @@ export default function CreateReimbursementPage() {
                         : "text-slate-500",
                     )}
                   >
-                    ⚡ AUTO
+                    ⚡ {t("reimbursements.create.auto")}
                   </button>
                   <button
                     type="button"
@@ -476,7 +474,7 @@ export default function CreateReimbursementPage() {
                         : "text-slate-500",
                     )}
                   >
-                    📋 MANUAL
+                    📋 {t("reimbursements.create.manual")}
                   </button>
                 </div>
               </div>
@@ -484,12 +482,12 @@ export default function CreateReimbursementPage() {
 
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-slate-600">
-                Description
+                {t("reimbursements.create.description")}
               </label>
               <textarea
                 rows={2}
                 required
-                placeholder="State explicit procedural grounds explaining adjustments (e.g. Subscriber account debited during batch drop...)"
+                placeholder={t("reimbursements.create.descriptionPlaceholder")}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all resize-none"
@@ -502,7 +500,7 @@ export default function CreateReimbursementPage() {
             <div className="border-b border-slate-100 pb-3 flex items-center gap-2">
               <Layers className="h-4 w-4 text-indigo-600" />
               <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                2. Target MSISDN List
+                {t("reimbursements.create.targetMsisdnList")}
               </h2>
             </div>
 
@@ -524,9 +522,9 @@ export default function CreateReimbursementPage() {
                 )}
               >
                 <User className="h-4 w-4" />
-                <span>Single Subscriber</span>
+                <span>{t("reimbursements.create.singleSubscriber")}</span>
                 <span className="text-[9px] text-slate-400 font-medium font-mono">
-                  1 MSISDN ➔ 1 Product
+                  {t("reimbursements.create.singleSubSub")}
                 </span>
               </button>
 
@@ -546,9 +544,9 @@ export default function CreateReimbursementPage() {
                 )}
               >
                 <Users className="h-4 w-4" />
-                <span>Batch Group Subscribers</span>
+                <span>{t("reimbursements.create.batchSubscribers")}</span>
                 <span className="text-[9px] text-slate-400 font-medium font-mono">
-                  Many MSISDN ➔ 1 Product
+                  {t("reimbursements.create.batchSubSub")}
                 </span>
               </button>
 
@@ -568,9 +566,9 @@ export default function CreateReimbursementPage() {
                 )}
               >
                 <Layers className="h-4 w-4" />
-                <span>Complex Matrix</span>
+                <span>{t("reimbursements.create.complexMatrix")}</span>
                 <span className="text-[9px] text-slate-400 font-medium font-mono">
-                  Many MSISDN ➔ Varied Rows
+                  {t("reimbursements.create.complexMatrixSub")}
                 </span>
               </button>
             </div>
@@ -580,7 +578,7 @@ export default function CreateReimbursementPage() {
               {distributionMode === "SINGLE_SINGLE" && (
                 <div className="flex flex-col gap-1.5 animate-in fade-in duration-200">
                   <label className="text-xs font-bold text-slate-600">
-                    Target Subscriber MSISDN{" "}
+                    {t("reimbursements.create.targetSubscriberMsisdn")}{" "}
                     <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -598,7 +596,7 @@ export default function CreateReimbursementPage() {
                   <div className="flex items-center justify-between relative z-40">
                     <div>
                       <span className="text-xs font-bold text-slate-700 block">
-                        Upload Subscribers List
+                        {t("reimbursements.create.uploadSubscribersList")}
                       </span>
                     </div>
 
@@ -610,7 +608,8 @@ export default function CreateReimbursementPage() {
                         }
                         className="text-[10px] font-bold text-indigo-600 flex items-center gap-1 bg-white px-2.5 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 shadow-sm transition-colors active:scale-95"
                       >
-                        <Download className="h-3 w-3" /> Get Template{" "}
+                        <Download className="h-3 w-3" />{" "}
+                        {t("reimbursements.create.getTemplate")}{" "}
                         <ChevronDown className="h-2.5 w-2.5" />
                       </button>
 
@@ -628,7 +627,8 @@ export default function CreateReimbursementPage() {
                                 }}
                                 className="w-full text-left px-3 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 block transition-colors"
                               >
-                                .{fmt.toUpperCase()} Schema
+                                .{fmt.toUpperCase()}{" "}
+                                {t("reimbursements.create.schema")}
                               </button>
                             ),
                           )}
@@ -651,7 +651,7 @@ export default function CreateReimbursementPage() {
             <div className="border-b border-slate-100 pb-3 flex items-center gap-2">
               <Package className="h-4 w-4 text-indigo-600" />
               <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                3. Reimbursement Asset
+                {t("reimbursements.create.reimbursementAsset")}
               </h2>
             </div>
 
@@ -659,19 +659,17 @@ export default function CreateReimbursementPage() {
               <div className="bg-indigo-50/50 rounded-xl border border-indigo-100 p-4 text-center flex flex-col items-center justify-center gap-1 text-indigo-900 animate-in fade-in duration-200">
                 <Layers className="h-5 w-5 text-indigo-500" />
                 <span className="text-xs font-bold">
-                  Dynamic Spreadsheet Extraction Active
+                  {t("reimbursements.create.dynamicSpreadsheetActive")}
                 </span>
                 <p className="text-[10px] text-indigo-600/80 leading-relaxed px-2">
-                  Package targets and value allocations are systematically
-                  evaluated row-by-row within the file payload instance mapping
-                  layer.
+                  {t("reimbursements.create.dynamicSpreadsheetDesc")}
                 </p>
               </div>
             ) : (
               <div className="flex flex-col gap-4 animate-in fade-in duration-200">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-slate-600">
-                    Reimbursement Asset Type
+                    {t("reimbursements.create.reimbursementAssetType")}
                   </label>
                   <select
                     value={reimbursementType}
@@ -682,8 +680,12 @@ export default function CreateReimbursementPage() {
                     }}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500 cursor-pointer"
                   >
-                    <option value="BUNDLE">Bundle Provisioning</option>
-                    <option value="AIRTIME">Airtime Transfer</option>
+                    <option value="BUNDLE">
+                      {t("reimbursements.create.bundleProvisioning")}
+                    </option>
+                    <option value="AIRTIME">
+                      {t("reimbursements.create.airtimeTransfer")}
+                    </option>
                   </select>
                 </div>
 
@@ -691,7 +693,7 @@ export default function CreateReimbursementPage() {
                   <div className="grid grid-cols-1 gap-3 border-t border-slate-100 pt-3">
                     <div className="flex flex-col gap-1.5">
                       <label className="text-xs font-bold text-slate-600">
-                        Bundle Category
+                        {t("reimbursements.create.bundleCategory")}
                       </label>
                       <div className="flex overflow-x-auto flex-nowrap gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 scrollbar-thin scrollbar-thumb-slate-300">
                         {categories.map((cat) => (
@@ -720,7 +722,7 @@ export default function CreateReimbursementPage() {
                       ref={dropdownRef}
                     >
                       <label className="text-xs font-bold text-slate-600">
-                        Select Bundle
+                        {t("reimbursements.create.selectBundle")}
                       </label>
                       <div
                         onClick={() => setIsSearchOpen(!isSearchOpen)}
@@ -742,7 +744,9 @@ export default function CreateReimbursementPage() {
                             <Search className="absolute left-2.5 h-3.5 w-3.5 text-slate-400" />
                             <input
                               type="text"
-                              placeholder="Search bundle by id, price or name"
+                              placeholder={t(
+                                "reimbursements.create.searchBundlePlaceholder",
+                              )}
                               value={searchQuery}
                               onChange={(e) => setSearchQuery(e.target.value)}
                               className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-800 outline-none focus:border-indigo-500 font-medium"
@@ -751,8 +755,7 @@ export default function CreateReimbursementPage() {
                           <div className="flex flex-col gap-0.5">
                             {filteredBundles.length === 0 ? (
                               <span className="text-[11px] text-center text-slate-400 py-3 font-medium">
-                                No system catalog packages found matching
-                                parameter inputs.
+                                {t("reimbursements.create.noCatalogFound")}
                               </span>
                             ) : (
                               filteredBundles.map((pkg) => (
@@ -776,7 +779,8 @@ export default function CreateReimbursementPage() {
 
                                   <div className="flex items-center justify-between mt-1">
                                     <span className="font-mono text-[10px] text-slate-500">
-                                      Offer ID: {pkg.offer_id}
+                                      {t("reimbursements.create.offerId")}:{" "}
+                                      {pkg.offer_id}
                                     </span>
 
                                     <span className="font-mono text-[10px] bg-slate-200/60 px-1.5 py-0.5 rounded text-slate-600">
@@ -794,7 +798,7 @@ export default function CreateReimbursementPage() {
                 ) : (
                   <div className="flex flex-col gap-1.5 border-t border-slate-100 pt-3">
                     <label className="text-xs font-bold text-slate-600">
-                      Airtime Cash Value
+                      {t("reimbursements.create.airtimeCashValue")}
                     </label>
                     <div className="relative">
                       <Coins className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -819,10 +823,10 @@ export default function CreateReimbursementPage() {
             <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
               <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
                 <Paperclip className="h-4 w-4 text-indigo-600" />
-                4. Evidence Attachments
+                {t("reimbursements.create.evidenceAttachments")}
               </h2>
               <label className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors shadow-sm">
-                Add Evidence
+                {t("reimbursements.create.addEvidence")}
                 <input
                   type="file"
                   multiple
@@ -834,8 +838,7 @@ export default function CreateReimbursementPage() {
 
             {attachments.length === 0 ? (
               <div className="border border-dashed border-slate-200 rounded-xl p-6 text-center text-slate-400 text-xs font-medium bg-slate-50/50">
-                No evidence attachments uploaded yet. Click "Add Evidence" to
-                upload supporting files.
+                {t("reimbursements.create.noEvidenceUploaded")}
               </div>
             ) : (
               <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto">
@@ -876,7 +879,7 @@ export default function CreateReimbursementPage() {
               onClick={() => navigate("/reimbursements")}
               className="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 border border-slate-200 transition-all"
             >
-              Discard Form
+              {t("reimbursements.create.discardForm")}
             </button>
             <button
               type="submit"
@@ -885,7 +888,9 @@ export default function CreateReimbursementPage() {
               }
               className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md disabled:bg-slate-200 transition-all active:scale-95"
             >
-              {isSubmitting ? "Queueing Entries..." : "Commit Reimbursement"}
+              {isSubmitting
+                ? t("reimbursements.create.queueingEntries")
+                : t("reimbursements.create.commitReimbursement")}
             </button>
           </div>
         </div>
@@ -899,7 +904,7 @@ export default function CreateReimbursementPage() {
         <div className="border border-dashed border-indigo-200 bg-indigo-50/20 rounded-xl p-8 text-center flex flex-col items-center justify-center gap-3">
           <div className="h-6 w-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
           <span className="text-xs font-bold text-indigo-700">
-            Streaming source data arrays to ledger rules validation engine...
+            {t("reimbursements.create.streamingData")}
           </span>
         </div>
       );
@@ -929,10 +934,10 @@ export default function CreateReimbursementPage() {
           </div>
           <div>
             <span className="text-xs font-bold text-slate-700 block">
-              Drag & drop batch data matrix sheet layout, or browse local files
+              {t("reimbursements.create.dragDrop")}
             </span>
             <span className="text-[10px] text-slate-400 font-medium">
-              Limits layout specifications: Max upload allowance 10MB
+              {t("reimbursements.create.maxUploadSize")}
             </span>
           </div>
         </div>
@@ -965,7 +970,7 @@ export default function CreateReimbursementPage() {
         <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-bold">
           <div className="bg-slate-50 rounded-lg p-2 border border-slate-100">
             <span className="text-[9px] font-bold text-slate-400 block uppercase">
-              Ingested Row Items
+              {t("reimbursements.create.ingestedRowItems")}
             </span>
             <span className="text-sm font-black text-slate-700">
               {bulkMetrics.total}
@@ -973,7 +978,7 @@ export default function CreateReimbursementPage() {
           </div>
           <div className="bg-green-50/40 rounded-lg p-2 border border-green-100">
             <span className="text-[9px] font-bold text-green-500 block uppercase">
-              Validated Targets
+              {t("reimbursements.create.validatedTargets")}
             </span>
             <span className="text-sm font-black text-green-700 flex items-center justify-center gap-0.5">
               <CheckCircle2 className="h-3 w-3 text-green-500" />{" "}
@@ -982,7 +987,7 @@ export default function CreateReimbursementPage() {
           </div>
           <div className="bg-red-50/40 rounded-lg p-2 border border-red-100">
             <span className="text-[9px] font-bold text-red-500 block uppercase">
-              Rejected Errors
+              {t("reimbursements.create.rejectedErrors")}
             </span>
             <span className="text-sm font-black text-red-700 flex items-center justify-center gap-0.5">
               <AlertCircle className="h-3 w-3 text-red-500" />{" "}
@@ -994,16 +999,20 @@ export default function CreateReimbursementPage() {
         {bulkErrors.length > 0 && (
           <div className="flex flex-col gap-1 animate-in slide-in-from-top-2 duration-200">
             <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider block">
-              Ingestion Fault Diagnostics Logs
+              {t("reimbursements.create.ingestionFaultLogs")}
             </span>
             <div className="border border-red-100 rounded-lg overflow-hidden text-[11px] bg-white max-h-48 overflow-y-auto shadow-inner">
               <table className="w-full border-collapse">
                 <thead className="sticky top-0 bg-red-50 z-10">
                   <tr className="border-b border-red-100 text-red-700 text-left font-bold">
-                    <th className="p-2 w-16">Row ID</th>
-                    <th className="p-2 w-32">Identifier</th>
+                    <th className="p-2 w-16">
+                      {t("reimbursements.create.rowId")}
+                    </th>
+                    <th className="p-2 w-32">
+                      {t("reimbursements.create.identifier")}
+                    </th>
                     <th className="p-2">
-                      Failure Reason Description Framework
+                      {t("reimbursements.create.failureReason")}
                     </th>
                   </tr>
                 </thead>

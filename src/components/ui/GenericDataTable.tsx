@@ -1,4 +1,3 @@
-// /var/www/html/uap-frontend/src/components/ui/GenericDataTable.tsx
 import React, { useEffect, useRef, useState } from "react";
 import {
   Search,
@@ -8,24 +7,20 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  Filter,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createPortal } from "react-dom";
 import { useAuthStore } from "@/store/authStore";
-import { Filter, ChevronUp } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export interface FilterConfig {
   id: string;
-
-  // Name shown in the Filters dropdown
   menuLabel?: string;
-
-  // Existing dropdown props
   label?: string;
   value?: string;
   options?: { label: string; value: string }[];
   onChange?: (value: string) => void;
-
   custom?: React.ReactNode;
 }
 
@@ -47,7 +42,6 @@ export interface ActionItem<T> {
   onClick: (item: T) => void;
   variant?: "default" | "danger";
   hidden?: (item: T) => boolean;
-  /** Pass an array of string permissions. User needs at least one to view the action item. */
   permissions?: string[];
 }
 
@@ -68,7 +62,6 @@ interface GenericDataTableProps<T> {
   actions?: ActionItem<T>[];
   filters?: FilterConfig[];
   onAddClick?: () => void;
-  /** Pass a single string token required to view/trigger the Add button */
   addPermission?: string;
   onExportClick?: () => void;
   searchPlaceholder?: string;
@@ -94,7 +87,7 @@ export function GenericDataTable<T>({
   onAddClick,
   addPermission,
   onExportClick,
-  searchPlaceholder = "Search...",
+  searchPlaceholder,
   isLoading = false,
   pagination,
   onPageChange,
@@ -106,11 +99,15 @@ export function GenericDataTable<T>({
   searchWidth = "w-full",
   filterContent,
 }: GenericDataTableProps<T>) {
+  const { t } = useTranslation();
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const [filterMenuOpen, setFilterMenuOpen] = useState(false);
   const filterMenuRef = useRef<HTMLDivElement>(null);
+
+  const effectiveSearchPlaceholder =
+    searchPlaceholder ?? t("common.table.searchPlaceholder");
 
   const filterKeys = filters.map(
     (filter, index) => filter.id || filter.label || `filter-${index}`,
@@ -121,7 +118,6 @@ export function GenericDataTable<T>({
   const filterContentKeys = (filterContent ?? []).map((f) => f.id);
   const allFilterKeys = [...filterKeys, ...filterContentKeys];
 
-  // Pull active user authority configurations directly inside the loop
   const userPermissions = useAuthStore(
     (state) => state.user?.permissions || [],
   );
@@ -132,7 +128,6 @@ export function GenericDataTable<T>({
     );
   }, [filterContentKeys.join(",")]);
 
-  // Sync menu state out when interacting with background layers
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -150,13 +145,11 @@ export function GenericDataTable<T>({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // 1. Filter out actions if user lacks required permission tokens
   const allowedActions = actions.filter((action) => {
     if (!action.permissions || action.permissions.length === 0) return true;
     return action.permissions.some((perm) => userPermissions.includes(perm));
   });
 
-  // 2. Validate user holds specific clearances before making primary addition CTA visible
   const isAdditionVisible =
     showAdd &&
     onAddClick &&
@@ -192,7 +185,7 @@ export function GenericDataTable<T>({
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
             <input
               type="text"
-              placeholder={searchPlaceholder}
+              placeholder={effectiveSearchPlaceholder}
               onChange={(e) => onSearchChange?.(e.target.value)}
               className="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/10 transition-all"
             />
@@ -269,14 +262,14 @@ export function GenericDataTable<T>({
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 rounded-lg font-bold text-[11px] hover:bg-slate-50 transition-all shadow-sm h-9"
               >
                 <Filter className="h-3.5 w-3.5" />
-                Filters
+                {t("common.table.filters")}
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
 
               {filterMenuOpen && (
                 <div className="absolute right-0 mt-2 w-64 rounded-xl border border-slate-200 bg-white shadow-xl z-50 p-2">
                   <div className="px-2 pb-2 mb-2 border-b text-xs font-semibold text-slate-500">
-                    Visible Filters
+                    {t("common.table.visibleFilters")}
                   </div>
 
                   {[
@@ -317,14 +310,14 @@ export function GenericDataTable<T>({
                         className="flex-1 rounded-md border px-2 py-1 text-xs hover:bg-slate-50"
                         onClick={() => setVisibleFilters(allFilterKeys)}
                       >
-                        Show All
+                        {t("common.table.showAll")}
                       </button>
 
                       <button
                         className="flex-1 rounded-md border px-2 py-1 text-xs hover:bg-slate-50"
                         onClick={() => setVisibleFilters([])}
                       >
-                        Hide All
+                        {t("common.table.hideAll")}
                       </button>
                     </div>
                   )}
@@ -339,7 +332,7 @@ export function GenericDataTable<T>({
               className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 rounded-lg font-bold text-[11px] hover:bg-slate-50 transition-all active:scale-95 shadow-sm h-9"
             >
               <Download className="h-3.5 w-3.5" />
-              Export
+              {t("common.table.export")}
             </button>
           )}
 
@@ -349,7 +342,7 @@ export function GenericDataTable<T>({
               className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg font-bold text-[11px] hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 active:scale-95 h-9"
             >
               <Plus className="h-3.5 w-3.5" />
-              Add New
+              {t("common.table.addNew")}
             </button>
           )}
         </div>
@@ -373,7 +366,7 @@ export function GenericDataTable<T>({
               ))}
               {hasActions && (
                 <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                  Actions
+                  {t("common.table.actions")}
                 </th>
               )}
             </tr>
@@ -396,7 +389,7 @@ export function GenericDataTable<T>({
                   colSpan={columns.length + (hasActions ? 1 : 0)}
                   className="px-6 py-12 text-center text-slate-400 text-sm"
                 >
-                  No data found
+                  {t("common.table.noData")}
                 </td>
               </tr>
             ) : (
@@ -427,7 +420,6 @@ export function GenericDataTable<T>({
                           return null;
                         }
 
-                        // Single action -> render icon button directly
                         if (visibleActions.length === 1) {
                           const action = visibleActions[0];
 
@@ -458,7 +450,6 @@ export function GenericDataTable<T>({
                           );
                         }
 
-                        // Multiple actions -> existing dropdown
                         return (
                           <div className="relative flex justify-end">
                             <button
@@ -532,15 +523,17 @@ export function GenericDataTable<T>({
       {pagination && (
         <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
           <p className="text-[11px] font-bold text-slate-400">
-            Showing <span className="text-slate-900">{pagination.from}</span> to{" "}
-            <span className="text-slate-900">{pagination.to}</span> of{" "}
-            <span className="text-slate-900">{pagination.total}</span> entries
+            {t("common.table.paginationShowing", {
+              from: pagination.from,
+              to: pagination.to,
+              total: pagination.total,
+            })}
           </p>
 
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-bold text-slate-400">
-                Rows per page:
+                {t("common.table.rowsPerPage")}
               </span>
               <select
                 className="bg-transparent text-[11px] font-bold text-slate-900 focus:outline-none cursor-pointer"
@@ -568,7 +561,7 @@ export function GenericDataTable<T>({
                   {pagination.current_page}
                 </span>
                 <span className="text-[11px] font-bold text-slate-400 mx-2 text-nowrap">
-                  of {pagination.last_page}
+                  {t("common.table.ofPages", { count: pagination.last_page })}
                 </span>
               </div>
               <button

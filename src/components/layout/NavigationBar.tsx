@@ -4,9 +4,11 @@ import { X, LayoutDashboard } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTabStore } from "@/store/tabStore";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 export function NavigationBar() {
-  const { tabs, activeTabId, removeTab, setActiveTab } = useTabStore();
+  const { t } = useTranslation();
+  const { tabs, activeTabId, removeTab } = useTabStore();
   const navigate = useNavigate();
 
   const handleCloseTab = (e: React.MouseEvent, id: string) => {
@@ -15,7 +17,6 @@ export function NavigationBar() {
 
     const nextTab = removeTab(id);
 
-    // IMPORTANT: allow store to control state first
     requestAnimationFrame(() => {
       if (nextTab) {
         navigate(nextTab.url);
@@ -23,6 +24,14 @@ export function NavigationBar() {
         navigate("/dashboard");
       }
     });
+  };
+
+  const getTranslatedTitle = (tab: any) => {
+    const cleanId = tab.id.replace(/^\/+|\/+$/g, "");
+    if (cleanId === "dashboard") {
+      return t("navigation.dashboard");
+    }
+    return tab.title;
   };
 
   return (
@@ -45,7 +54,7 @@ export function NavigationBar() {
             )}
           >
             <Icon className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">{tab.title}</span>
+            <span className="truncate">{getTranslatedTitle(tab)}</span>
 
             {/* Close button - hidden for dashboard */}
             {tab.id !== "dashboard" && (

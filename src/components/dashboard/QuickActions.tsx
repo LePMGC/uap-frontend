@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { Play, Loader2, Settings2 } from "lucide-react";
 import { InstanceService } from "@/services/instanceService";
 import type { ProviderInstance, Command } from "@/services/instanceService";
+import { useTranslation } from "react-i18next";
 
 export function QuickActions() {
+  const { t } = useTranslation();
   const [providers, setProviders] = useState<ProviderInstance[]>([]);
   const [commands, setCommands] = useState<Command[]>([]);
 
@@ -55,7 +57,6 @@ export function QuickActions() {
   const handleContinue = () => {
     const commandDetails = commands.find((c) => c.name === selectedCommand);
     console.log("Opening configuration for:", commandDetails);
-    // Logic to open a modal or navigate to a configuration page goes here
   };
 
   return (
@@ -66,14 +67,14 @@ export function QuickActions() {
             <Settings2 className="h-4 w-4 text-indigo-600" />
           </div>
           <h2 className="font-bold text-slate-800 text-sm whitespace-nowrap">
-            Quick Execute
+            {t("dashboard.quickActions.title")}
           </h2>
         </div>
 
         <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
           <div className="md:col-span-4 space-y-1.5">
             <label className="text-[10px] font-bold text-slate-400 uppercase flex justify-between">
-              Provider{" "}
+              {t("dashboard.quickActions.provider")}{" "}
               {isLoadingProviders && (
                 <Loader2 className="h-3 w-3 animate-spin" />
               )}
@@ -93,7 +94,7 @@ export function QuickActions() {
 
           <div className="md:col-span-5 space-y-1.5">
             <label className="text-[10px] font-bold text-slate-400 uppercase flex justify-between">
-              Command{" "}
+              {t("dashboard.quickActions.command")}{" "}
               {isLoadingCommands && (
                 <Loader2 className="h-3 w-3 animate-spin" />
               )}
@@ -111,7 +112,9 @@ export function QuickActions() {
                   </option>
                 ))
               ) : (
-                <option value="">No commands available</option>
+                <option value="">
+                  {t("dashboard.quickActions.noCommands")}
+                </option>
               )}
             </select>
           </div>
@@ -122,7 +125,8 @@ export function QuickActions() {
               disabled={!selectedCommand || isLoadingCommands}
               className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-lg px-4 py-2 text-sm font-bold flex items-center justify-center gap-2 active:scale-95 disabled:bg-slate-100 disabled:text-slate-400 transition-all"
             >
-              Continue <Play className="h-3 w-3 fill-current" />
+              {t("dashboard.quickActions.continue")}{" "}
+              <Play className="h-3 w-3 fill-current" />
             </button>
           </div>
         </div>

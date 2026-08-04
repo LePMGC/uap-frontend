@@ -1,5 +1,4 @@
 // /var/www/html/uap-frontend/src/components/navigation/Sidebar.tsx
-import { useState } from "react";
 import {
   LayoutDashboard,
   PlayCircle,
@@ -25,136 +24,6 @@ import { PERM } from "@/types/auth";
 import { useTabStore } from "@/store/tabStore";
 import { useTranslation } from "react-i18next";
 
-// Mapping menu groups and granular item endpoints to explicit security strings
-const menuGroups = [
-  {
-    label: "OPERATIONS",
-    requiredPermissions: [
-      PERM.VIEW_INSTANCES,
-      PERM.VIEW_OWN_COMMAND_LOGS,
-      PERM.VIEW_ALL_COMMAND_LOGS,
-      PERM.VIEW_OWN_BATCH_TEMPLATES,
-      PERM.VIEW_ALL_BATCH_TEMPLATES,
-      PERM.VIEW_OWN_BATCH_INSTANCES,
-      PERM.VIEW_ALL_BATCH_INSTANCES,
-      PERM.VIEW_TRACE_TIMELINE,
-      PERM.VIEW_ALL_REIMBURSEMENTS,
-      PERM.VIEW_OWN_REIMBURSEMENTS,
-    ],
-    items: [
-      {
-        name: "Dashboard",
-        icon: LayoutDashboard,
-        url: "/dashboard",
-        requiredPermission: PERM.VIEW_INSTANCES,
-      },
-      {
-        name: "Reimbursements",
-        icon: ReceiptEuro,
-        url: "/reimbursements",
-        requiredPermission:
-          PERM.VIEW_OWN_REIMBURSEMENTS || PERM.VIEW_ALL_REIMBURSEMENTS,
-      },
-      {
-        name: "Single Execution",
-        icon: PlayCircle,
-        url: "/single-execution",
-        requiredPermission: PERM.EXECUTE_COMMANDS,
-      },
-      {
-        name: "Command Logs",
-        icon: ListFilter,
-        url: "/commands-logs",
-        requiredPermission: PERM.VIEW_OWN_COMMAND_LOGS,
-      },
-      {
-        name: "Batch Jobs",
-        icon: Layers,
-        url: "/batch-jobs",
-        requiredPermission: PERM.VIEW_OWN_BATCH_INSTANCES,
-      },
-      {
-        name: "Logs",
-        icon: Activity,
-        url: "/logs",
-        requiredPermission: PERM.VIEW_TRACE_TIMELINE,
-      },
-    ],
-  },
-  {
-    label: "MANAGEMENT",
-    requiredPermissions: [
-      PERM.VIEW_PROVIDERS,
-      PERM.VIEW_DATASOURCES,
-      PERM.VIEW_ALL_COMMANDS,
-      PERM.VIEW_OWN_COMMANDS,
-      PERM.VIEW_COMMAND_BLUEPRINTS,
-      PERM.VIEW_PROVISIONING_PROFILES,
-      PERM.VIEW_FUNDING_ACCOUNTS,
-    ],
-    items: [
-      {
-        name: "Providers",
-        icon: Server,
-        url: "/providers-instances",
-        requiredPermission: PERM.VIEW_PROVIDERS,
-      },
-      {
-        name: "Data Sources",
-        icon: Database,
-        url: "/data-sources",
-        requiredPermission: PERM.VIEW_DATASOURCES,
-      },
-      {
-        name: "Command Defs",
-        icon: Code2,
-        url: "/commands-definitions",
-        requiredPermission: PERM.VIEW_OWN_COMMANDS,
-      },
-      {
-        name: "Provisioning Profiles",
-        icon: Layers,
-        url: "/provisioning-profiles",
-        requiredPermission: PERM.VIEW_PROVISIONING_PROFILES,
-      },
-      {
-        name: "Funding Accounts",
-        icon: Server,
-        url: "/funding-accounts",
-        requiredPermission: PERM.VIEW_FUNDING_ACCOUNTS,
-      },
-    ],
-  },
-  {
-    label: "GOVERNANCE",
-    requiredPermissions: [
-      PERM.VIEW_USERS,
-      PERM.VIEW_ROLES,
-      PERM.VIEW_AUDIT_LOGS,
-    ],
-    items: [
-      {
-        name: "Users Management",
-        icon: Users,
-        url: "/users",
-        requiredPermission: PERM.VIEW_USERS,
-      },
-      {
-        name: "Roles & Permissions",
-        icon: UserCircle,
-        url: "/roles",
-        requiredPermission: PERM.VIEW_ROLES,
-      },
-      {
-        name: "Audit Logs",
-        icon: ShieldCheck,
-        url: "/audit-logs",
-        requiredPermission: PERM.VIEW_AUDIT_LOGS,
-      },
-    ],
-  },
-];
-
 const LANGUAGES = [
   { code: "en", label: "English" },
   { code: "fr", label: "Français" },
@@ -170,6 +39,138 @@ export function Sidebar() {
   const location = useLocation();
   const addTab = useTabStore((state) => state.addTab);
   const { t, i18n } = useTranslation();
+
+  const menuGroups = [
+    {
+      key: "OPERATIONS",
+      label: t("sidebar.groups.OPERATIONS"),
+      requiredPermissions: [
+        PERM.VIEW_INSTANCES,
+        PERM.VIEW_OWN_COMMAND_LOGS,
+        PERM.VIEW_ALL_COMMAND_LOGS,
+        PERM.VIEW_OWN_BATCH_TEMPLATES,
+        PERM.VIEW_ALL_BATCH_TEMPLATES,
+        PERM.VIEW_OWN_BATCH_INSTANCES,
+        PERM.VIEW_ALL_BATCH_INSTANCES,
+        PERM.VIEW_TRACE_TIMELINE,
+        PERM.VIEW_ALL_REIMBURSEMENTS,
+        PERM.VIEW_OWN_REIMBURSEMENTS,
+      ],
+      items: [
+        {
+          name: t("sidebar.nav.dashboard"),
+          icon: LayoutDashboard,
+          url: "/dashboard",
+          requiredPermission: PERM.VIEW_INSTANCES,
+        },
+        {
+          name: t("sidebar.nav.reimbursements"),
+          icon: ReceiptEuro,
+          url: "/reimbursements",
+          requiredPermission:
+            PERM.VIEW_OWN_REIMBURSEMENTS || PERM.VIEW_ALL_REIMBURSEMENTS,
+        },
+        {
+          name: t("sidebar.nav.singleExecution"),
+          icon: PlayCircle,
+          url: "/single-execution",
+          requiredPermission: PERM.EXECUTE_COMMANDS,
+        },
+        {
+          name: t("sidebar.nav.commandLogs"),
+          icon: ListFilter,
+          url: "/commands-logs",
+          requiredPermission: PERM.VIEW_OWN_COMMAND_LOGS,
+        },
+        {
+          name: t("sidebar.nav.batchJobs"),
+          icon: Layers,
+          url: "/batch-jobs",
+          requiredPermission: PERM.VIEW_OWN_BATCH_INSTANCES,
+        },
+        {
+          name: t("sidebar.nav.logs"),
+          icon: Activity,
+          url: "/logs",
+          requiredPermission: PERM.VIEW_TRACE_TIMELINE,
+        },
+      ],
+    },
+    {
+      key: "MANAGEMENT",
+      label: t("sidebar.groups.MANAGEMENT"),
+      requiredPermissions: [
+        PERM.VIEW_PROVIDERS,
+        PERM.VIEW_DATASOURCES,
+        PERM.VIEW_ALL_COMMANDS,
+        PERM.VIEW_OWN_COMMANDS,
+        PERM.VIEW_COMMAND_BLUEPRINTS,
+        PERM.VIEW_PROVISIONING_PROFILES,
+        PERM.VIEW_FUNDING_ACCOUNTS,
+      ],
+      items: [
+        {
+          name: t("sidebar.nav.providers"),
+          icon: Server,
+          url: "/providers-instances",
+          requiredPermission: PERM.VIEW_PROVIDERS,
+        },
+        {
+          name: t("sidebar.nav.dataSources"),
+          icon: Database,
+          url: "/data-sources",
+          requiredPermission: PERM.VIEW_DATASOURCES,
+        },
+        {
+          name: t("sidebar.nav.commandDefs"),
+          icon: Code2,
+          url: "/commands-definitions",
+          requiredPermission: PERM.VIEW_OWN_COMMANDS,
+        },
+        {
+          name: t("sidebar.nav.provisioningProfiles"),
+          icon: Layers,
+          url: "/provisioning-profiles",
+          requiredPermission: PERM.VIEW_PROVISIONING_PROFILES,
+        },
+        {
+          name: t("sidebar.nav.fundingAccounts"),
+          icon: Server,
+          url: "/funding-accounts",
+          requiredPermission: PERM.VIEW_FUNDING_ACCOUNTS,
+        },
+      ],
+    },
+    {
+      key: "GOVERNANCE",
+      label: t("sidebar.groups.GOVERNANCE"),
+      requiredPermissions: [
+        PERM.VIEW_USERS,
+        PERM.VIEW_ROLES,
+        PERM.VIEW_AUDIT_LOGS,
+      ],
+      items: [
+        {
+          name: t("sidebar.nav.usersManagement"),
+          icon: Users,
+          url: "/users",
+          requiredPermission: PERM.VIEW_USERS,
+        },
+        {
+          name: t("sidebar.nav.rolesPermissions"),
+          icon: UserCircle,
+          url: "/roles",
+          requiredPermission: PERM.VIEW_ROLES,
+        },
+        {
+          name: t("sidebar.nav.auditLogs"),
+          icon: ShieldCheck,
+          url: "/audit-logs",
+          requiredPermission: PERM.VIEW_AUDIT_LOGS,
+        },
+      ],
+    },
+  ];
 
   const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     i18n.changeLanguage(e.target.value);
@@ -188,7 +189,7 @@ export function Sidebar() {
       <nav className="flex-1 px-4 py-2 space-y-8 overflow-y-auto custom-scrollbar">
         {menuGroups.map((group) => (
           <HasPermission
-            key={group.label}
+            key={group.key}
             permissions={group.requiredPermissions}
           >
             <div className="animate-in fade-in slide-in-from-left-2 duration-300">
@@ -203,7 +204,7 @@ export function Sidebar() {
 
                   return (
                     <HasPermission
-                      key={item.name}
+                      key={item.url}
                       permission={item.requiredPermission}
                     >
                       <Link
@@ -281,10 +282,10 @@ export function Sidebar() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-slate-900 truncate">
-                {user?.name || "Operations User"}
+                {user?.name || t("sidebar.defaultUser")}
               </p>
               <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">
-                {user?.role || "Administrator"}
+                {user?.role || t("sidebar.defaultRole")}
               </p>
             </div>
           </div>

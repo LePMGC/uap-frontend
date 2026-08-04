@@ -98,12 +98,14 @@ export default function UsersPage() {
 
   const userFilters: FilterConfig[] = [
     {
+      id: "role",
       label: "Role",
       value: roleFilter,
       onChange: (val) => handleFilterChange(setRoleFilter, val),
       options: roleOptions,
     },
     {
+      id: "status",
       label: "Status",
       value: statusFilter,
       onChange: (val) =>
