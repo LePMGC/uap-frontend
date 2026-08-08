@@ -1,113 +1,92 @@
-import { X, CheckCircle2 } from "lucide-react";
+import React from "react";
 
-interface Props {
+export interface DataPreviewPanelProps {
   visible: boolean;
-  data?: any;
+  data: {
+    fileName?: string;
+    totalRecords?: number;
+    total_records?: number;
+    headers?: string[];
+    schema?: Record<string, any>[];
+  };
   onClose: () => void;
   onConfirm: () => void;
 }
 
-export function DataPreviewPanel({ visible, data, onClose, onConfirm }: Props) {
-  if (!visible || !data) return null;
+export function DataPreviewPanel({
+  visible,
+  data,
+  onClose,
+  onConfirm,
+}: DataPreviewPanelProps) {
+  if (!visible) return null;
 
-  // Use the schema array from our data object for the preview rows
-  const rows = data.schema || [];
-
-  // Extract headers from the first row of data
-  const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
+  const totalCount = data?.totalRecords ?? data?.total_records ?? 0;
 
   return (
-    <div className="w-full shrink-0 animate-in fade-in slide-in-from-right-4 duration-300">
-      <div className="bg-white border border-slate-200 rounded-[2rem] shadow-sm overflow-hidden flex flex-col">
-        {/* 🟢 PANEL HEADER (With X Close Button) */}
-        <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h4 className="text-[11px] font-black uppercase tracking-[0.15em] text-slate-500">
-              Schema Preview
-            </h4>
-            <span className="flex items-center gap-1 text-[9px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-black uppercase tracking-wider">
-              <CheckCircle2 className="h-3 w-3" />
-              Detected
-            </span>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* 🟢 INFO SECTION */}
-        <div className="px-5 py-4 bg-white">
-          <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
-            Valid format. Previewing first {rows.length} rows of
-            <span className="text-slate-900 font-bold ml-1">
-              `{data.fileName || "source_file"}`
-            </span>
-            .
+    <div className="bg-white border border-slate-200 rounded-[2rem] p-6 shadow-xl space-y-6">
+      {/* Header with Total Count Badge */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">
+            Data Preview
+          </h3>
+          <p className="text-[11px] text-slate-500">
+            {data.fileName || "Input List"}
           </p>
         </div>
 
-        {/* 🟢 MINI PREVIEW TABLE (Using Table Semantics) */}
-        <div className="px-5 pb-2">
-          <div className="border border-slate-100 rounded-xl overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100">
-                    {headers.map((key) => (
-                      <th
-                        key={key}
-                        className="px-3 py-2 text-[10px] font-black text-slate-500 uppercase tracking-tighter border-r last:border-r-0 border-slate-100"
-                      >
-                        {key}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {rows.slice(0, 10).map((row: any, i: number) => (
-                    <tr
-                      key={i}
-                      className="hover:bg-slate-50/50 transition-colors"
-                    >
-                      {Object.values(row).map((val: any, j: number) => (
-                        <td
-                          key={j}
-                          className="px-3 py-2 text-[11px] text-slate-600 font-medium border-r last:border-r-0 border-slate-50 truncate max-w-[120px]"
-                        >
-                          {String(val)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+        {/* Total Count Badge */}
+        <div className="bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-xl text-right">
+          <p className="text-[9px] font-black uppercase text-indigo-400 tracking-wider">
+            Count
+          </p>
+          <p className="text-sm font-black text-indigo-600 font-mono">
+            {totalCount.toLocaleString()}
+          </p>
         </div>
+      </div>
 
-        {/* 🟢 FIXED FOOTER ACTION */}
-        <div className="p-5 border-t border-slate-100 bg-white shrink-0">
-          <button
-            onClick={onConfirm}
-            className="w-full py-2.5 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 shadow-lg shadow-slate-200 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
-          >
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-            Confirm Definition
-          </button>
+      {/* Table Preview */}
+      <div className="overflow-x-auto max-h-[300px] border border-slate-100 rounded-xl">
+        <table className="w-full text-left text-xs">
+          <thead className="bg-slate-50 sticky top-0">
+            <tr>
+              {data.headers?.map((header: string) => (
+                <th
+                  key={header}
+                  className="px-4 py-2 font-bold text-slate-600 uppercase"
+                >
+                  {header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 font-mono text-[11px]">
+            {data.schema?.map((row: Record<string, any>, i: number) => (
+              <tr key={i} className="hover:bg-slate-50/50">
+                {Object.values(row).map((val: any, j: number) => (
+                  <td key={j} className="px-4 py-2 text-slate-700">
+                    {val}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-          {/* Subtle helper text to fill the space visually without adding bulk */}
-          <div className="flex items-center justify-center gap-1.5 mt-3 opacity-40">
-            <span className="h-px w-4 bg-slate-300"></span>
-            <p className="text-[8px] text-slate-500 font-bold uppercase tracking-tighter">
-              Ready for mapping
-            </p>
-            <span className="h-px w-4 bg-slate-300"></span>
-          </div>
-        </div>
+      {/* Footer Info */}
+      <div className="flex items-center justify-between pt-2">
+        <span className="text-[10px] text-slate-400 italic">
+          Showing preview of top {data.schema?.length || 0} rows
+        </span>
+        <button
+          onClick={onConfirm}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all"
+        >
+          Confirm & Proceed
+        </button>
       </div>
     </div>
   );

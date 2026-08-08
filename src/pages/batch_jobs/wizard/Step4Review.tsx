@@ -1,3 +1,5 @@
+// src/components/batch-jobs/Step4Review.tsx
+
 import {
   CheckCircle2,
   Edit3,
@@ -6,6 +8,7 @@ import {
   Calendar,
   Clock,
   Server,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -15,14 +18,11 @@ interface Step4Props {
 }
 
 export function Step4Review({ data, goToStep }: Step4Props) {
-  // 🕒 Cron Parser (Simplified for brevity, keep your existing logic here)
   const getHumanReadableCron = (cron: string) => {
     if (!cron) return "Not scheduled";
-    // ... your existing parsing logic ...
     return cron;
   };
 
-  // 🧮 Calculate actual mapped parameters (not excluded)
   const mappedCount = Object.values(data.column_mapping || {}).filter(
     (m: any) => !m.excluded && m.value !== "",
   ).length;
@@ -44,10 +44,21 @@ export function Step4Review({ data, goToStep }: Step4Props) {
     </div>
   );
 
+  const totalRecords =
+    data.preview?.totalRecords ??
+    data.preview?.total_records ??
+    data.source_config?.total_records ??
+    0;
+
+  const fileName =
+    data.preview?.fileName ||
+    data.source_config?.original_name ||
+    data.source_config?.file_name;
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="grid gap-5">
-        {/* SECTION 1: SOURCE & COMMAND */}
+        {/* SECTION 1: SOURCE & INFRASTRUCTURE */}
         <div className="bg-white border border-slate-200 rounded-[2rem] p-8 shadow-sm">
           {renderSectionHeader(1, "SOURCE & INFRASTRUCTURE", 1)}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-y-8 gap-x-12">
@@ -86,14 +97,29 @@ export function Step4Review({ data, goToStep }: Step4Props) {
 
             <div className="space-y-1">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
-                Data Source
+                Data Source & Input File
               </p>
-              <div className="flex items-center gap-2 text-slate-700 font-semibold text-sm">
-                <Database className="h-3.5 w-3.5 text-indigo-500" />
-                <span className="capitalize">{data.source_type}</span>
-                <span className="text-slate-400 font-medium">
-                  ({data.preview?.fileName || "External Source"})
-                </span>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 text-slate-700 font-semibold text-sm">
+                    <Database className="h-3.5 w-3.5 text-indigo-500" />
+                    <span className="capitalize">{data.source_type}</span>
+                  </div>
+                  {totalRecords > 0 && (
+                    <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-0.5 rounded-full text-xs font-mono font-black">
+                      {totalRecords.toLocaleString()} records
+                    </span>
+                  )}
+                </div>
+
+                {fileName && (
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium pt-0.5">
+                    <FileText className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    <span className="truncate max-w-[220px]" title={fileName}>
+                      {fileName}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -117,7 +143,11 @@ export function Step4Review({ data, goToStep }: Step4Props) {
               </div>
               <p className="text-[11px] text-slate-500 font-medium mt-1">
                 Field connections verified. System will process {mappedCount}{" "}
-                key-value pairs per row.
+                key-value pairs per row across{" "}
+                <strong className="text-slate-800">
+                  {totalRecords.toLocaleString()} total records
+                </strong>
+                .
               </p>
             </div>
           </div>

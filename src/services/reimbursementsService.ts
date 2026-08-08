@@ -477,7 +477,7 @@ export const reimbursementsService = {
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `provisioning-report-${id}.xlsx`); // Adjust file extension if needed
+    link.setAttribute("download", `provisioning-report-${id}.csv`); // Adjust file extension if needed
     document.body.appendChild(link);
     link.click();
     link.remove();

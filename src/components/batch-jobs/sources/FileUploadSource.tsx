@@ -33,16 +33,21 @@ export function FileUploadSource({ data, updateData }: any) {
 
     try {
       const response = await batchJobsService.discoverSchema(formData);
+
+      const recordCount = response.total_records ?? response.totalRecords ?? 0;
+
       updateData({
         source_type: "upload",
         source_config: {
           temporary_path: response.temporary_path,
           original_name: file.name,
+          total_records: recordCount,
         },
         preview: {
           fileName: file.name,
           headers: response.headers,
           schema: response.preview,
+          totalRecords: recordCount,
         },
       });
       showToast(`Successfully analyzed ${file.name}`, "success");
@@ -65,7 +70,6 @@ export function FileUploadSource({ data, updateData }: any) {
   const downloadSample = async () => {
     try {
       showToast("Preparing your template...", "success");
-
       await batchJobsService.downloadSampleInputFile();
     } catch (error) {
       showToast("Failed to download sample file.", "error");

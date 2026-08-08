@@ -157,22 +157,39 @@ export function Step1BasicInfo({ data, updateData, onConfirm }: Step1Props) {
   ]);
 
   /* ---------------- HANDLERS ---------------- */
-
-  const handleTriggerPreview = () => {
+  const handleTriggerPreview = (discoveryResponse?: any) => {
     if (!canTriggerPreview) return;
 
-    // Mocking the detection process
-    const mockPreviewData = {
+    // Extract total records safely across response structures
+    const extractedTotalRecords =
+      discoveryResponse?.total_records ??
+      discoveryResponse?.totalRecords ??
+      discoveryResponse?.data?.total_records ??
+      data.source_config?.total_records ??
+      data.source_config?.totalRecords ??
+      0;
+
+    const totalRecordsNum = Number(extractedTotalRecords) || 0;
+
+    const previewPayload = {
       fileName:
-        data.source_type === "upload" ? "users_export.csv" : "Query_Result_01",
-      detectedRows: 3,
-      schema: [
-        { id: "101", status: "Active", last_sync: "2026-03-20" },
-        { id: "102", status: "Pending", last_sync: "2026-03-21" },
-        { id: "103", status: "Active", last_sync: "2026-03-22" },
-      ],
+        data.source_type === "upload"
+          ? data.source_config?.file_name || "uploaded_file.csv"
+          : "Query_Result_01",
+      totalRecords: totalRecordsNum,
+      headers: discoveryResponse?.headers ??
+        discoveryResponse?.data?.headers ?? ["msisdn"],
+      schema:
+        discoveryResponse?.preview ?? discoveryResponse?.data?.preview ?? [],
     };
-    updateData({ preview: mockPreviewData });
+
+    updateData({
+      preview: previewPayload,
+      source_config: {
+        ...data.source_config,
+        total_records: totalRecordsNum,
+      },
+    });
   };
 
   const handleClosePreview = () => {

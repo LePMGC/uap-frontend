@@ -1498,7 +1498,7 @@ export default function ReimbursementDetailsPage() {
                     : t("reimbursements.details.downloadReport")}
                 </button>
 
-                {/* View Command Log - Only visible if user has command log permissions */}
+                {/* View Command Log - Only visible if user has command log permissions 
                 {(userPermissions.includes(PERM.VIEW_OWN_COMMAND_LOGS) ||
                   userPermissions.includes(PERM.VIEW_ALL_COMMAND_LOGS)) && (
                   <button
@@ -1516,9 +1516,9 @@ export default function ReimbursementDetailsPage() {
                     <Terminal className="h-3.5 w-3.5 text-slate-500" />
                     {t("reimbursements.details.viewCommandLog")}
                   </button>
-                )}
+                )} */}
 
-                {/* View Batch Job - Only visible if user has batch job permissions */}
+                {/* View Batch Job - Only visible if user has batch job permissions 
                 {(userPermissions.includes(PERM.VIEW_OWN_BATCH_INSTANCES) ||
                   userPermissions.includes(PERM.VIEW_ALL_BATCH_INSTANCES)) && (
                   <button
@@ -1536,7 +1536,7 @@ export default function ReimbursementDetailsPage() {
                     <LayersIcon className="h-3.5 w-3.5 text-slate-500" />
                     {t("reimbursements.details.viewBatchJob")}
                   </button>
-                )}
+                )} */}
               </div>
             </div>
           )}

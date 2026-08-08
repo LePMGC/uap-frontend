@@ -101,8 +101,7 @@ export default function CommandLogsPage() {
       header: "Target (MSISDN)",
       accessor: (item: any) => (
         <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded">
-          #{" "}
-          {item?.payloads?.request?.data?.subscriberNumber ?? "Raw / No MSISDN"}
+          # {item?.metadata?.identifier ?? "Raw / No MSISDN"}
         </span>
       ),
     },
